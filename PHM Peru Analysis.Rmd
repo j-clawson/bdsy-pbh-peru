@@ -1,29 +1,97 @@
 ---
-title: "PHM Peru Analysis"
-output: html_document
-date: "2025-06-25"
+title: "Time Series Analysis"
+author: "James Clawson, Antonio Bolea, Kevin Truong"
+date: 6/54/2025
+date-format: long
+format:
+  html:
+    theme: sandstone
+    toc: true
+    html-math-method: katex
+editor: visual
+highlight-style: tango
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Environment Setup
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+#| eval: FALSE
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+renv::init()      # Initialize the project     
+renv::restore()   # Download packages and their version saved in the lockfile
 ```
 
-## Including Plots
+```{r}
+#| message: FALSE
+#| warning: FALSE
 
-You can also embed plots, for example:
+suppressPackageStartupMessages({
+  library("readr")      # For reading in the data
+  library("tibble")     # For handling tidyverse tibble data classes
+  library("tidyr")      # For tidying data 
+  library("dplyr")      # For data manipulation 
+  library("stringr")    # For string manipulation
+  library("MASS")       # Functions/datasets for statistical analysis
+  library("lubridate")  # For date manipulation
+  library("ggplot2")    # For creating static visualizations
+  library("scales")     # For formatting plots axis
+  library("gridExtra")  # Creates multiple grid-based plots
+})
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+
+# Function to select "Not In"
+'%!in%' <- function(x,y)!('%in%'(x,y))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Load the data
+
+NOTE: Location of csv file may be different, adjust accordingly
+
+```{r}
+df <- read.csv('data\\peru\\peru.csv')
+```
+
+```{r}
+colnames(df) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
+glimpse(df)
+```
+
+```{r}
+summary(df)
+```
+
+## Data dictionary
+
+-   **region:** The geographic region in which the data was recorded: refers to Peru's departments (states).
+
+-   **province:** The province in which the data was recorded: refers to Peru's counties.
+
+-   **district:** The district in which the data was recorded: refers to Peru's towns/cities. Data was collected at local government health establishments. 
+
+-   **year:** .
+
+-   **week:** .
+
+-   **department_code:** .
+
+-   **geo_code:** .
+
+-   **under_5_noncase:** .
+
+-   **under_5_case:** .
+
+-   **over_60_case:** .
+
+-   **under_5_hospitalized:** .
+
+-   **over_60_hospitalized:** .
+
+-   **under_5_death:** .
+
+-   **over_60_death:** .
+
+
