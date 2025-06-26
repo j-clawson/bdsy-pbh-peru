@@ -75,29 +75,26 @@ summary(df_cases)
 
 -   **province:** The province in which the data was recorded: refers to Peru's counties.
 
--   **district:** The district in which the data was recorded: refers to Peru's towns/cities. Data was collected at local government health establishments. 
+-   **district:** The district in which the data was recorded: refers to Peru's towns/cities.
 
--   **year:** .
+-   **year:** The year in which the data was recorded.
 
--   **week:** .
+-   **week:** The specific week of the year in which the data was recorded.
 
--   **department_code:** .
+-   **department_code:** The code of the health directorate in which the data was recorded.
 
--   **geo_code:** .
+-   **geo_code:** The geographical identification code of the area in which the data was recorded. Peru uses UBIGEO— "UBlcación GEOgráfica," a code assigned to particular districts in Peru.
 
--   **under_5_noncase:** .
+-   **under_5_noncase:** A count representing the number of recorded pneumonia non-cases for children under 5-years-old.
 
--   **under_5_case:** .
+-   **under_5_case:** A count representing the number of recorded pneumonia cases for children under 5-years-old.
 
--   **over_60_case:** .
+-   **over_60_case:** A count representing the number of recorded pneumonia cases for adults over 60-years-old.
 
--   **under_5_hospitalized:** .
+-   **under_5_hospitalized:** A count representing the number of pneumonia-related hospitalizations for children under 5-years-old.
 
--   **over_60_hospitalized:** .
+-   **over_60_hospitalized:** A count representing the number of pneumonia-related hospitalizations for adults over 60-years-old.
 
--   **under_5_death:** .
+-   **under_5_death:** A count representing the number of pneumonia-related deaths for children under 5-years-old.
 
--   **over_60_death:** .
-
-
-
+-   **over_60_death:** A count representing the number of pneumonia-related deaths for adults over 60-years-old.
