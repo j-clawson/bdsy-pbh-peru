@@ -52,16 +52,21 @@ suppressPackageStartupMessages({
 NOTE: Location of csv file may be different, adjust accordingly
 
 ```{r}
-df <- read.csv('data\\peru\\peru.csv')
+df_cases <- read.csv('data\\peru\\peru.csv')
+df_gps <- read.csv('data\\peru\\peru_gps.csv')
 ```
 
 ```{r}
-colnames(df) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
-glimpse(df)
+colnames(df_cases) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
+glimpse(df_cases)
 ```
 
 ```{r}
-summary(df)
+glimpse(df_gps)
+```
+
+```{r}
+summary(df_cases)
 ```
 
 ## Data dictionary
@@ -93,5 +98,6 @@ summary(df)
 -   **under_5_death:** .
 
 -   **over_60_death:** .
+
 
 
