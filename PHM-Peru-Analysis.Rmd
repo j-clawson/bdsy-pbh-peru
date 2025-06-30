@@ -76,7 +76,7 @@ summary(peru)
 -   **region:** The geographic region in which the data was recorded: refers to Peru's departments (states).
 
 -   **province:** The province in which the data was recorded: refers to Peru's counties.
--   
+
 -   **district:** The district in which the data was recorded: refers to Peru's towns/cities. Data was collected at local government health establishments.
 
 -   **year:** The year in which the data was recorded.
