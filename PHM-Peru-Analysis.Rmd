@@ -209,8 +209,11 @@ p1
 Histogram for distribution of deaths
 
 ```{r}
-Total_Deaths <- deaths_by_region$total_deaths
+deaths_by_region <- peru %>%
+  group_by(region) %>%
+  summarise(total_deaths = sum(under_5_death), .groups = "drop")
 
+Total_Deaths <- deaths_by_region$total_deaths
 deaths_hist <- hist(Total_Deaths, breaks=8,
                     main="Overall distribution of death counts across regions",
                     xlab="Total Death Counts",
@@ -222,9 +225,6 @@ Visualizing the number of deaths by region
 
 ```{r}
 
-deaths_by_region <- peru %>%
-  group_by(region) %>%
-  summarise(total_deaths = sum(under_5_death), .groups = "drop")
 
 p3 <- ggplot(deaths_by_region, 
              aes(x = reorder(region, total_deaths), y = total_deaths)) +
