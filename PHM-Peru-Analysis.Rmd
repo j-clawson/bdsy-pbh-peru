@@ -205,27 +205,43 @@ p1 <-
 
 p1
 ```
+
+Histogram for distribution of deaths
+
+```{r}
+Total_Deaths <- deaths_by_region$total_deaths
+
+deaths_hist <- hist(Total_Deaths, breaks=8,
+                    main="Overall distribution of death counts across regions",
+                    xlab="Total Death Counts",
+                    col="darkmagenta")
+
+```
+
 Visualizing the number of deaths by region
+
 ```{r}
 
 deaths_by_region <- peru %>%
   group_by(region) %>%
   summarise(total_deaths = sum(under_5_death), .groups = "drop")
 
-p3 <- ggplot(deaths_by_region, aes(x = region, y = total_deaths)) +
+p3 <- ggplot(deaths_by_region, 
+             aes(x = reorder(region, total_deaths), y = total_deaths)) +
   geom_col(fill = "skyblue") +
   labs(
-    title = "Total Under-5 Deaths by Region",
+    title = "Total <5 Deaths by Region",
     x = "Region",
-    y = "Total Under-5 Deaths"
+    y = "Total <5 Deaths"
   ) +
   theme_minimal() + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
 
+p3
 ```
 
-Aggregate weekly counts as monthly counts, indexed by the start of that month.
-(copied from above, can delete)
+Aggregate weekly counts as monthly counts, indexed by the start of that month. (copied from above, can delete)
+
 ```{r}
 df <- peru[c("year","week", "region", "under_5_death")]
 
@@ -252,6 +268,7 @@ df <- df %>%
 ```
 
 making a line plot of deaths by month and region
+
 ```{r}
 
 #creating a function to map deaths by region
@@ -274,6 +291,7 @@ region_to_point <- function(data, region_name) {
 ```
 
 Example to visualize the function
+
 ```{r}
 p4a <- region_to_point(df, "SAN MARTIN")
 p4b <- region_to_point(df, "PUNO")
