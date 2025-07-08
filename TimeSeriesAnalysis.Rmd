@@ -70,9 +70,9 @@ Getting estimated dates for vaccine implementation. Set as July 1 of the year it
 
 ```{r}
 # Estimation when PCV7, PCV10 and PCV13 was introduced
-pcv7.intro.date <- as.Date('2009-07-01')
-pcv10.intro.date <- as.Date('2011-07-01')
-pcv13.intro.date <- as.Date('2013-07-01')
+pcv7_intro_date <- as.Date('2009-07-01')
+pcv10_intro_date <- as.Date('2011-07-01')
+pcv13_intro_date <- as.Date('2013-07-01')
 
 ```
 
@@ -238,9 +238,75 @@ p1c
 
 To check for changes in disease levels, implement use a spline model, then implement a counter factual (extrapolation based on pre-PCV13 dates).
 
-## Spline Model
+# Time Series for National Death Counts
 
-## Counter factual
+First, we will implement two models to see whether the trend or level of the disease changes. We will work on the total national death counts, then make two graphs for each regions later.
+
+## ITS Spline Model
+
+Interrupted Time Series with Connected Segments
+
+```{r}
+intro_index <- which(df_ts$date == pcv13_intro_date)
+df_ts <- df_ts %>%
+  mutate(
+    spl1 = ifelse(index - intro_index + 1 < 0, 0, index - intro_index + 1)
+  )
+
+# Inspect the changes.
+df_ts[65:80, c("date", "index", "spl1", "log_offset")]
+
+```
+
+```{r}
+mod4 <- glm.nb(under5_deaths ~ index + month + offset(log_offset) +
+                 # Post-vaccine changes.
+                 spl1, data = df_ts)
+
+summary(mod4)
+```
+
+Get fitted and counterfactual for the spline model.
+
+```{r}
+# Add the prediction using the smoothed model.
+df_pred_spl <- df_ts %>%
+  mutate(pred.spl = predict(mod4, type = "response"))
+
+```
+
+```{r}
+# Make predictions with confidence intervals.
+pred7 <- predict(mod4, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+df_pred_spl <- df_pred_spl %>%
+  mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+
+p7 <- 
+  ggplot(df_pred_spl, aes(x = date, y = under5_deaths)) +
+      geom_point() +
+      # Add the fitted line.
+      geom_line(data = df_pred_spl, aes(x = date, y = pred.spl),
+                color = "#377eb8") +
+      # Add the confidence interval.
+      geom_ribbon(data = df_pred_spl, aes(ymin = conf.low, ymax = conf.high),
+                  alpha = 0.2, fill = "blue") +
+      labs(title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
+         x = "Date", y = "Counts for <5 yo") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
+p7
+```
+
+## Counter factual (Extrapolation Based on the Pre-Vaccine Period)
 
 ```{r}
 df_pre13 <- df_ts
@@ -276,4 +342,12 @@ p9 <- ggplot(ds.pred.mod5, aes(x=date, y=under5_deaths_pre)) +
       geom_hline(yintercept=0, col='gray', lty=2) +
       geom_line(color='#377eb8', data=ds.pred.mod5, aes(x=date, y=pred.mod5))
 p9
+```
+
+# Regional Time Series Analysis
+
+Now we will implement these models for each region.
+
+```{r}
+
 ```
