@@ -60,7 +60,6 @@ Renaming the columns into English.
 
 ```{r}
 colnames(peru) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
-glimpse(peru)
 ```
 
 ```{r}
@@ -104,21 +103,23 @@ df_nation <- df_nation %>%
   )
 ```
 
-# Time Series
-
-First, fit a simple GLM with a negative binomial fit for the nation's \<5 yo death counts.
-
 ```{r}
-# For modeling, we need to use an ordered, discrete variable. Simply, we 
-# can use the rownames for this purpose.
-df_ts <- tibble::rownames_to_column(df_nation, var = "index") %>%
-  mutate(index = as.numeric(index))
+#| fig.width: 6
+#| fig.height: 4
 
-# Apply the negative binomial regression.
-mod1 <- glm.nb(under5_deaths ~ index , data = df_ts)
+p1 <- 
+  ggplot(df_nation, aes(x = date, y = under5_deaths)) +
+      geom_point() +
+      labs(title = "<5 yo Deaths Scatter Plot",
+         x = "Date", y = "Counts") +
+      # Have y-axis for the two plots be the same.
+      ylim(0, NA) +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
 
-# Examine the fitting results.
-summary(mod1)
+p1
 ```
 
 Plotting the model:
