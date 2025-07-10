@@ -1,5 +1,5 @@
 ---
-title: "EDA of Peru Pneumonia Death Counts"
+title: "Time Series Analysis of Peru and its Region's Pneumonia Death Counts"
 author: "James Clawson, Antonio Bolea, Kevin Truong"
 date: 6/54/2025
 date-format: long
@@ -335,9 +335,10 @@ p7 <-
     # Observed points
     geom_point(aes(y = under5_deaths, shape = "Observed"), colour = "black", size   = 1,  alpha  = 0.6) +
     # Fitted spline line
-    geom_line( aes(y = pred.spl,         color = "Fitted model"), size = 0.7) +
+    geom_line( aes(y = pred.spl,         color = "Fitted model"), size = 0.6) +
     # Confidence ribbon
-    geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = "95% CI"), alpha = 0.2) +
+    geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = "95% CI"), 
+                alpha = 0.3) +
     # Vaccine introduction marker
     geom_vline(aes(xintercept = pcv13_intro_date, color = "PCV13 implementation"),
                linetype = "dashed", size = 1) +
@@ -346,13 +347,13 @@ p7 <-
       name   = "",
       values = c(
         "Observed"        = "black",
-        "Fitted model"    = "#377eb8",
+        "Fitted model"    = "#219ebc",
         "PCV13 implementation"   = "#fb8500"
       )
     ) +
     scale_fill_manual(
       name   = "",
-      values = c("95% CI" = "gray80")
+      values = c("95% CI" = "#8ecae6")
     ) +
     scale_shape_manual(
       name   = "",
@@ -361,13 +362,14 @@ p7 <-
     labs(
       title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
       x     = "Date",
-      y     = "Counts for <5 yo"
+      y     = "<5 Deaths"
     ) +
     theme_linedraw() +
     theme(
-      panel.spacing   = unit(2, "lines"),
-      axis.text.x     = element_text(angle = 90, hjust = 1),
-      legend.position = "top"
+      axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
+      axis.text.y     = element_text(size = 10),
+      legend.position = "top",
+      legend.text     = element_text(size = 12)
     )
 
 
@@ -382,7 +384,7 @@ df_pre13 <- df_nation
 #Set the pneumonia variable to NA during the post-vaccine period
 df_pre13$under5_deaths_pre <- df_pre13$under5_deaths
 
-df_pre13$under5_deaths_pre[which(df_pre13$date >= pcv13.intro.date)] <- NA
+df_pre13$under5_deaths_pre[which(df_pre13$date >= pcv13_intro_date)] <- NA
 
 
 ```
@@ -405,8 +407,7 @@ p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
   # observed points
   geom_point(aes(y = under5_deaths_pre, color = "Observed"), size = 1, alpha = 0.6) +
   # fitted (counterfactual) line
-  geom_line( aes(y = pred.cf_model,    color = "Fitted model"),  size = 0.7) +
-  geom_hline(yintercept = 0, color = "gray70", linetype = "dotted") +
+  geom_line( aes(y = pred.cf_model,    color = "Fitted model"),  size = 0.6) +
   # vaccine rollout
   geom_vline(aes(xintercept = pcv13_intro_date, color = "PCV13 implementation"),
              linetype = "dashed", size = 1) +
@@ -416,7 +417,7 @@ p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
     name = "",    # no legend title
     values = c(
       "Observed"      = "black",
-      "Fitted model"  = "#377eb8",
+      "Fitted model"  = "#8ecae6",
       "PCV13 implementation" = "#fb8500"
     )
   ) +
@@ -432,8 +433,10 @@ p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
   ) +
   theme_linedraw() +
   theme(
-    axis.text.x     = element_text(angle = 90, hjust = 1),
-    legend.position = "top"
+    axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
+    axis.text.y     = element_text(size = 10),
+    legend.position = "top",
+    legend.text     = element_text(size = 12)
   )
 p9
 ```
@@ -500,12 +503,12 @@ plot_region_spline <- function(region_name, df_region, intro_date) {
     geom_line(
       data = df_plot,
       aes(x = date, y = fit, color = "Fitted model"),
-      size = 0.7
+      size = 0.6
     ) +
     geom_ribbon(
       data = df_plot,
       aes(x = date, ymin = conf.lo, ymax = conf.hi, fill = "95% CI"),
-      alpha = 0.2
+      alpha = 0.3
     ) +
     geom_vline(
       aes(xintercept = intro_date, color = "PCV13 introduction"),
@@ -537,8 +540,10 @@ plot_region_spline <- function(region_name, df_region, intro_date) {
     ) +
     theme_linedraw() +
     theme(
-      axis.text.x = element_text(angle = 90, hjust = 1),
-      legend.position = "top"
+      axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
+      axis.text.y     = element_text(size = 10),
+      legend.position = "top",
+      legend.text     = element_text(size = 12)
     )
 }
 
@@ -578,7 +583,7 @@ plot_region_extrapolation <- function(region_name, df_region, intro_date) {
     geom_line(
       data = df_plot,
       aes(x = date, y = fit_cf, color = "Counterfactual"),
-      size = 0.7
+      size = 0.6
     ) +
     geom_vline(
       aes(xintercept = intro_date, color = "PCV13 introduction"),
@@ -602,8 +607,10 @@ plot_region_extrapolation <- function(region_name, df_region, intro_date) {
     ) +
     theme_linedraw() +
     theme(
-      axis.text.x     = element_text(angle = 90, hjust = 1),
-      legend.position = "top"
+      axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
+      axis.text.y     = element_text(size = 10),
+      legend.position = "top",
+      legend.text     = element_text(size = 12)
     )
 }
 ```
@@ -623,7 +630,7 @@ print(p2)
 combined <- p1 | p2
 
 ggsave(
-  filename = "MOQUEGUA_two_panel.png",
+  filename = "MOQUEGUA_PUNO_two_panel.png",
   plot     = combined,
   width    = 12,
   height   = 5,
