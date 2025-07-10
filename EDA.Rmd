@@ -213,7 +213,9 @@ Histogram for distribution of deaths
 ```{r}
 deaths_by_region <- peru %>%
   group_by(region) %>%
-  summarise(total_deaths = sum(under_5_death), .groups = "drop")
+  summarise(total_deaths = sum(under_5_death),
+            total_cases = sum(under_5_case),
+            .groups = "drop")
 
 Total_Deaths <- deaths_by_region$total_deaths
 deaths_hist <- hist(Total_Deaths, breaks=8,
@@ -222,7 +224,11 @@ deaths_hist <- hist(Total_Deaths, breaks=8,
                     col="darkmagenta")
 
 ```
+```{r}
+head(deaths_by_region)
+```
 
+## Regional EDA
 Visualizing the number of deaths by region
 
 ```{r}
@@ -241,6 +247,48 @@ p3 <- ggplot(deaths_by_region,
 
 p3
 ```
+```{r}
+gdp_pc_order <- c(
+  "LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA",
+  "MADRE DE DIOS", "CUSCO", "PASCO", "ANCASH", "LA LIBERTAD",
+  "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI",
+  "LORETO", "AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO",
+  "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO"
+)
+
+# 2) Compute death rate and re‐factor region
+df_plot <- deaths_by_region %>%
+  filter(region != "CALLAO") %>%
+  mutate(
+    death_rate = total_deaths / total_cases,
+    region     = factor(region, levels = gdp_pc_order[ gdp_pc_order!="CALLAO" ])
+  )
+
+# 3) Draw the bar chart
+p3 <- ggplot(df_plot, aes(x = region, y = death_rate)) +
+  geom_col(fill = "#fb8500") +
+  labs(
+    title = "<5 Mortality Rate by Region",
+    x     = "Region (ordered by GDP per capita, richest→poorest)",
+    y     = "Mortality rate (deaths ÷ cases)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
+  )
+p3
+```
+```{r}
+ggsave(
+  filename = "Regions_mortality_rate.png",
+  plot     = p3,
+  width    = 12,
+  height   = 5,
+  units    = "in",
+  dpi      = 300
+)
+```
+
 
 Aggregate weekly counts as monthly counts, indexed by the start of that month. (copied from above, can delete)
 
