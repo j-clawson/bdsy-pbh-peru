@@ -38,6 +38,7 @@ suppressPackageStartupMessages({
   library("MASS")       # Functions/datasets for statistical analysis
   library("lubridate")  # For date manipulation
   library("ggplot2")    # For creating static visualizations
+  library("patchwork")  # For plot stacking
   library("RColorBrewer")# For colors in graphs.
   library("scales")     # For formatting plots axis
   library("gridExtra")  # Creates multiple grid-based plots
@@ -104,6 +105,41 @@ df_nation <- df_nation %>%
 ```
 
 ```{r}
+df_region <- peru[c("year","week", "region", "under_5_death", "under_5_case")]
+
+#Group by year, week
+df_region <- df_region %>%
+  group_by(year, week, region) %>%
+  summarise(
+    under_5_deaths = sum(under_5_death, na.rm = TRUE),
+    under_5_cases = sum(under_5_case, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#Format week in standard format
+df_region <- df_region %>%
+  mutate(date = as.Date(paste0(year, '-01-01')) + weeks(week-1))
+
+#Aggregate into monthly counts
+df_region <- df_region %>%
+  mutate(date = floor_date(date, "month")) %>%
+  group_by(date, region) %>%
+  summarise(
+    under5_deaths = sum(under_5_deaths,   na.rm = TRUE),
+    under5_cases = sum(under_5_cases, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+Adding ordered & discrete variable for modeling
+
+```{r}
+df_nation <- tibble::rownames_to_column(df_nation, var = "index") %>%
+  mutate(index = as.numeric(index))
+
+```
+
+```{r}
 #| fig.width: 6
 #| fig.height: 4
 
@@ -132,7 +168,7 @@ Plotting the model:
 pred <- predict(mod1, type = "response", se.fit = TRUE)
 
 # Add the model predictions and 95% COI to the dataframe.
-df_pred <- df_ts %>%
+df_pred <- df_nation %>%
   mutate(se.fit = pred$se.fit, pred = pred$fit) %>%
   mutate(
     conf.low = pred - 1.96 * se.fit,
@@ -156,13 +192,13 @@ p1a
 Now adding seasonality:
 
 ```{r}
-df_ts$month <- as.factor(month(df_ts$date))
+df_nation$month <- as.factor(month(df_nation$date))
 
 # Inspect the first 36 entries.
-df_ts$month[1:36]
+df_nation$month[1:36]
 
 # Update the model.
-mod1a <- glm.nb(under5_deaths ~ date + month, data = df_ts)
+mod1a <- glm.nb(under5_deaths ~ date + month, data = df_nation)
 summary(mod1a)
 ```
 
@@ -174,7 +210,7 @@ summary(mod1a)
 pred2 <- predict(mod1a, type = "response", se.fit = TRUE)
 
 # Add the model predictions and 95% COI to the dataframe.
-df_pred2 <- df_ts %>%
+df_pred2 <- df_nation %>%
   mutate(se.fit = pred2$se.fit, pred = pred2$fit) %>%
   mutate(
     conf.low = pred - 1.96 * se.fit,
@@ -199,10 +235,10 @@ Adding a offset variable. All pneumonia cases for \<5 yo is used as the offset v
 
 ```{r}
 # Create the offset using all pneumonia cases
-df_ts$log_offset <- log(df_ts$under5_cases)
+df_nation$log_offset <- log(df_nation$under5_cases)
 
 # Refit the model.
-model1b <- glm.nb(under5_deaths ~ index + month + offset(log_offset), data = df_ts)
+model1b <- glm.nb(under5_deaths ~ index + month + offset(log_offset), data = df_nation)
 
 summary(model1b)
 ```
@@ -215,7 +251,7 @@ summary(model1b)
 pred3 <- predict(model1b, type = "response", se.fit = TRUE)
 
 # Add the model predictions and 95% COI to the dataframe.
-df.pred3 <- df_ts %>%
+df.pred3 <- df_nation %>%
   mutate(se.fit = pred3$se.fit, pred = pred3$fit) %>%
   mutate(
     conf.low = pred - 1.96 * se.fit,
@@ -247,37 +283,39 @@ First, we will implement two models to see whether the trend or level of the dis
 Interrupted Time Series with Connected Segments
 
 ```{r}
-intro_index <- which(df_ts$date == pcv13_intro_date)
-df_ts <- df_ts %>%
+intro_index <- which(df_nation$date == pcv13_intro_date)
+df_nation <- df_nation %>%
   mutate(
     spl1 = ifelse(index - intro_index + 1 < 0, 0, index - intro_index + 1)
   )
 
 # Inspect the changes.
-df_ts[65:80, c("date", "index", "spl1", "log_offset")]
+df_nation[65:80, c("date", "index", "spl1", "log_offset")]
 
 ```
+
+Fit the spline model.
 
 ```{r}
-mod4 <- glm.nb(under5_deaths ~ index + month + offset(log_offset) +
+spline_model <- glm.nb(under5_deaths ~ index + month + offset(log_offset) +
                  # Post-vaccine changes.
-                 spl1, data = df_ts)
+                 spl1, data = df_nation)
 
-summary(mod4)
+summary(spline_model)
 ```
-
-Get fitted and counterfactual for the spline model.
 
 ```{r}
 # Add the prediction using the smoothed model.
-df_pred_spl <- df_ts %>%
-  mutate(pred.spl = predict(mod4, type = "response"))
+df_pred_spl <- df_nation %>%
+  mutate(pred.spl = predict(spline_model, type = "response"))
 
 ```
 
+Plot the spline model.
+
 ```{r}
 # Make predictions with confidence intervals.
-pred7 <- predict(mod4, type = "response", se.fit = TRUE)
+pred7 <- predict(spline_model, type = "response", se.fit = TRUE)
 
 # Add the model predictions and 95% COI to the dataframe.
 df_pred_spl <- df_pred_spl %>%
@@ -287,29 +325,59 @@ df_pred_spl <- df_pred_spl %>%
     conf.high = pred + 1.96 * se.fit
   )
 
+```
 
+Plot the model.
+
+```{r}
 p7 <- 
-  ggplot(df_pred_spl, aes(x = date, y = under5_deaths)) +
-      geom_point() +
-      # Add the fitted line.
-      geom_line(data = df_pred_spl, aes(x = date, y = pred.spl),
-                color = "#377eb8") +
-      # Add the confidence interval.
-      geom_ribbon(data = df_pred_spl, aes(ymin = conf.low, ymax = conf.high),
-                  alpha = 0.2, fill = "blue") +
-      labs(title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
-         x = "Date", y = "Counts for <5 yo") +
-      theme_linedraw() +
-      # Specify aspects of the theme plot formatting settings.
-      theme(panel.spacing = unit(2, 'lines'), 
-            axis.text.x = element_text(angle = 90))
+  ggplot(df_pred_spl, aes(x = date)) +
+    # Observed points
+    geom_point(aes(y = under5_deaths, shape = "Observed"), colour = "black", size   = 1,  alpha  = 0.6) +
+    # Fitted spline line
+    geom_line( aes(y = pred.spl,         color = "Fitted model"), size = 0.7) +
+    # Confidence ribbon
+    geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = "95% CI"), alpha = 0.2) +
+    # Vaccine introduction marker
+    geom_vline(aes(xintercept = pcv13_intro_date, color = "PCV13 implementation"),
+               linetype = "dashed", size = 1) +
+    # Scales and legend
+    scale_color_manual(
+      name   = "",
+      values = c(
+        "Observed"        = "black",
+        "Fitted model"    = "#377eb8",
+        "PCV13 implementation"   = "#fb8500"
+      )
+    ) +
+    scale_fill_manual(
+      name   = "",
+      values = c("95% CI" = "gray80")
+    ) +
+    scale_shape_manual(
+      name   = "",
+      values = c("Observed" = 16)
+    ) +
+    labs(
+      title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
+      x     = "Date",
+      y     = "Counts for <5 yo"
+    ) +
+    theme_linedraw() +
+    theme(
+      panel.spacing   = unit(2, "lines"),
+      axis.text.x     = element_text(angle = 90, hjust = 1),
+      legend.position = "top"
+    )
+
+
 p7
 ```
 
 ## Counter factual (Extrapolation Based on the Pre-Vaccine Period)
 
 ```{r}
-df_pre13 <- df_ts
+df_pre13 <- df_nation
 
 #Set the pneumonia variable to NA during the post-vaccine period
 df_pre13$under5_deaths_pre <- df_pre13$under5_deaths
@@ -320,34 +388,278 @@ df_pre13$under5_deaths_pre[which(df_pre13$date >= pcv13.intro.date)] <- NA
 ```
 
 ```{r}
-mod5<- glm.nb(under5_deaths_pre ~ index # Time trend
+cf_model<- glm.nb(under5_deaths_pre ~ index # Time trend
               + month # Seasonality
               + offset(log_offset), data = df_pre13)
 
 # Add the prediction using the smoothed model.
-ds.pred.mod5 <- df_pre13 %>%
-  mutate(pred.mod5 = predict(mod5, type = "response", newdata = df_pre13))
+ds.pred.cf_model <- df_pre13 %>%
+  mutate(pred.cf_model = predict(cf_model, type = "response", newdata = df_pre13))
 ```
 
 Plot the model
 
 ```{r}
 
-p9 <- ggplot(ds.pred.mod5, aes(x=date, y=under5_deaths_pre)) +
-      geom_point() +
-      ylab("Deaths, <5 yo") +
-      xlab("Date") +
-      theme_linedraw() +
-      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) +
-      geom_hline(yintercept=0, col='gray', lty=2) +
-      geom_line(color='#377eb8', data=ds.pred.mod5, aes(x=date, y=pred.mod5))
+p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
+  # observed points
+  geom_point(aes(y = under5_deaths_pre, color = "Observed"), size = 1, alpha = 0.6) +
+  # fitted (counterfactual) line
+  geom_line( aes(y = pred.cf_model,    color = "Fitted model"),  size = 0.7) +
+  geom_hline(yintercept = 0, color = "gray70", linetype = "dotted") +
+  # vaccine rollout
+  geom_vline(aes(xintercept = pcv13_intro_date, color = "PCV13 implementation"),
+             linetype = "dashed", size = 1) +
+  
+  # now define the legend entries and their colours
+  scale_color_manual(
+    name = "",    # no legend title
+    values = c(
+      "Observed"      = "black",
+      "Fitted model"  = "#377eb8",
+      "PCV13 implementation" = "#fb8500"
+    )
+  ) +
+  # if you want shapes in the legend for points:
+  scale_shape_manual(
+    name   = "",
+    values = c("Observed" = 16)
+  ) +
+  labs(
+    title = "Extrapolation Based on the Pre-Vaccine Period",
+    x     = "Date",
+    y     = "<5 Deaths"
+  ) +
+  theme_linedraw() +
+  theme(
+    axis.text.x     = element_text(angle = 90, hjust = 1),
+    legend.position = "top"
+  )
 p9
+```
+
+```{r}
+combined <- p7 | p9
+
+ggsave(
+  filename = "PERU_two_panel.png",
+  plot     = combined,
+  width    = 12,
+  height   = 5,
+  units    = "in",
+  dpi      = 300
+)
 ```
 
 # Regional Time Series Analysis
 
 Now we will implement these models for each region.
 
+## Functions
+
+Function for a regional spline ITS plot.
+
+```{r}
+plot_region_spline <- function(region_name, df_region, intro_date) {
+  # Subset region and prepare indices
+  df_reg <- df_region %>%
+    filter(tolower(region) == tolower(region_name)) %>%
+    arrange(date)
+  
+  # Determine common y-axis max from observed deaths
+  y_max <- max(df_reg$under5_deaths, na.rm = TRUE)
+
+  # Build spline predictors and fit
+  df_plot <- df_reg %>%
+    mutate(
+      index      = row_number(),
+      month      = factor(month(date), levels = 1:12),
+      log_offset = log(under5_cases + 1),
+      spl1       = pmax(index - which(date == intro_date) + 1, 0)
+    ) %>%
+    {
+      mod <- glm.nb(under5_deaths ~ index + month + offset(log_offset) + spl1, data = .)
+      pred <- predict(mod, type = "response", se.fit = TRUE)
+      bind_cols(.,
+        fit = pred$fit,
+        se  = pred$se.fit
+      )
+    } %>%
+    mutate(
+      conf.lo = fit - 1.96 * se,
+      conf.hi = fit + 1.96 * se
+    )
+
+  # Plot with unified scale
+  ggplot() +
+    geom_point(
+      data = df_plot,
+      aes(x = date, y = under5_deaths, shape = "Observed"),
+      color = "black", size = 1, alpha = 0.6
+    ) +
+    geom_line(
+      data = df_plot,
+      aes(x = date, y = fit, color = "Fitted model"),
+      size = 0.7
+    ) +
+    geom_ribbon(
+      data = df_plot,
+      aes(x = date, ymin = conf.lo, ymax = conf.hi, fill = "95% CI"),
+      alpha = 0.2
+    ) +
+    geom_vline(
+      aes(xintercept = intro_date, color = "PCV13 introduction"),
+      linetype = "dashed", size = 1
+    ) +
+    scale_color_manual(
+      name = "",
+      values = c(
+        "Fitted model" = "#8ecae6",
+        "PCV13 introduction" = "#fb8500"
+      )
+    ) +
+    scale_fill_manual(
+      name = "",
+      values = c(
+        "95% CI" = "#219ebc"
+      )
+    ) +
+    scale_shape_manual(
+      name = "",
+      values = c(
+        "Observed" = 16
+      )
+    ) +
+    coord_cartesian(ylim = c(0, y_max)) +
+    labs(
+      title = paste(region_name, "— ITS Spline Fit"),
+      x = "Date", y = "<5 Deaths"
+    ) +
+    theme_linedraw() +
+    theme(
+      axis.text.x = element_text(angle = 90, hjust = 1),
+      legend.position = "top"
+    )
+}
+
+```
+
+Function for the region's counter factual.
+
+```{r}
+plot_region_extrapolation <- function(region_name, df_region, intro_date) {
+  # 1) subset and prepare
+  df_reg <- df_region %>%
+    filter(tolower(region) == tolower(region_name)) %>%
+    arrange(date) %>%
+    mutate(
+      index      = row_number(),
+      month      = factor(lubridate::month(date), levels=1:12),
+      log_offset = log(under5_cases + 1),
+      deaths_pre = if_else(date < intro_date, under5_deaths, NA_real_)
+    )
+
+  # 2) Fit *only* on the pre-vaccine rows
+  df_fit <- df_reg %>% filter(!is.na(deaths_pre))
+  cf_mod <- glm.nb(deaths_pre ~ index + month + offset(log_offset),
+                   data = df_fit)
+
+  # 3) Predict *over the full span*, so you get a counterfactual
+  df_plot <- df_reg %>%
+    mutate(fit_cf = predict(cf_mod, newdata = df_reg, type = "response"))
+
+  # 4) Plot
+  ggplot() +
+    geom_point(
+      data = df_plot %>% filter(!is.na(deaths_pre)),
+      aes(x = date, y = deaths_pre, shape = "Observed"),
+      color = "black", size = 1, alpha = 0.6
+    ) +
+    geom_line(
+      data = df_plot,
+      aes(x = date, y = fit_cf, color = "Counterfactual"),
+      size = 0.7
+    ) +
+    geom_vline(
+      aes(xintercept = intro_date, color = "PCV13 introduction"),
+      linetype = "dashed", size = 1
+    ) +
+    scale_color_manual(
+      name = "",
+      values = c(
+        "Counterfactual"     = "#8ecae6",
+        "PCV13 introduction" = "#fb8500"
+      )
+    ) +
+    scale_shape_manual(
+      name = "",
+      values = c("Observed" = 16)
+    ) +
+    coord_cartesian(ylim = c(0, max(df_reg$under5_deaths, na.rm = TRUE))) +
+    labs(
+      title = paste(region_name, "— Pre-Vaccine Extrapolation"),
+      x = "Date", y = "<5 Deaths"
+    ) +
+    theme_linedraw() +
+    theme(
+      axis.text.x     = element_text(angle = 90, hjust = 1),
+      legend.position = "top"
+    )
+}
+```
+
+```{r}
+# spline ITS
+p1 <- plot_region_spline("MOQUEGUA", df_region, pcv13.intro.date)
+# extrapolation
+p2 <- plot_region_extrapolation("MOQUEGUA", df_region, pcv13.intro.date)
+
+# display
+print(p1)
+print(p2)
+```
+
+```{r}
+combined <- p1 | p2
+
+ggsave(
+  filename = "MOQUEGUA_two_panel.png",
+  plot     = combined,
+  width    = 12,
+  height   = 5,
+  units    = "in",
+  dpi      = 300
+)
+```
+
 ```{r}
 
+df_region %>%  
+  filter(region=="MOQUEGUA") %>%  
+  mutate(
+    is_pre    = date < pcv13_intro_date,
+    log_off   = log(under5_cases)
+  ) %>% 
+  summarize(
+    total_rows      = n(),
+    pre_rows        = sum(is_pre),
+    valid_pre_deaths= sum(is_pre & !is.na(under5_deaths)),
+    zero_cases      = sum(under5_cases == 0),
+    neginf_offsets  = sum(!is.finite(log_off))
+  ) -> diag
+
+print(diag)
+```
+
+## All regions plotted
+
+```{r}
+regions <- unique(df_region$region)
+
+#this doesn't work.
+```
+
+```{r}
+moq_cases <- df_region[df_region$region == "MOQUEGUA", c("date","under5_deaths","under5_cases")]
+head(moq_cases)
 ```
