@@ -1,0 +1,705 @@
+---
+title: "PCV Impact Across Peru's Regions"
+author: "Antonio Bolea, James Clawson, Kevin Truong"
+date: 6/54/2025
+date-format: long
+format:
+  html:
+    theme: sandstone
+    toc: true
+    html-math-method: katex
+editor: visual
+highlight-style: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Environment Setup
+
+```{r}
+#| eval: FALSE
+
+renv::init()      # Initialize the project     
+renv::restore()   # Download packages and their version saved in the lockfile
+```
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+
+suppressPackageStartupMessages({
+  library("readr")      # For reading in the data
+  library("tibble")     # For handling tidyverse tibble data classes
+  library("tidyr")      # For tidying data 
+  library("dplyr")      # For data manipulation 
+  library("stringr")    # For string manipulation
+  library("MASS")       # Functions/datasets for statistical analysis
+  library("lubridate")  # For date manipulation
+  library("ggplot2")    # For creating static visualizations
+  library("scales")     # For formatting plots axis
+  library("gridExtra")  # Creates multiple grid-based plots
+})
+
+
+# Function to select "Not In"
+'%!in%' <- function(x,y)!('%in%'(x,y))
+```
+
+## Load the data
+
+NOTE: Location of csv file may be different, adjust accordingly
+
+```{r}
+df_cases <- read.csv('data\\peru\\peru.csv')
+df_gps <- read.csv('data\\peru\\peru_gps.csv')
+```
+
+```{r}
+colnames(df_hm) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
+glimpse(df_hm)
+```
+
+```{r}
+glimpse(df_gps)
+```
+
+```{r}
+summary(df_cases)
+```
+
+## Data dictionary
+
+-   **region:** The geographic region in which the data was recorded: refers to Peru's departments (states).
+
+-   **province:** The province in which the data was recorded: refers to Peru's counties.
+
+-   **district:** The district in which the data was recorded: refers to Peru's towns/cities.
+
+-   **year:** The year in which the data was recorded.
+
+-   **week:** The specific week of the year in which the data was recorded.
+
+-   **department_code:** The code of the health directorate in which the data was recorded.
+
+-   **geo_code:** The geographical identification code of the area in which the data was recorded. Peru uses UBIGEO— "UBlcación GEOgráfica," a code assigned to particular districts in Peru.
+
+-   **under_5_noncase:** A count representing the number of recorded pneumonia non-cases for children under 5-years-old.
+
+-   **under_5_case:** A count representing the number of recorded pneumonia cases for children under 5-years-old.
+
+-   **over_60_case:** A count representing the number of recorded pneumonia cases for adults over 60-years-old.
+
+-   **under_5_hospitalized:** A count representing the number of pneumonia-related hospitalizations for children under 5-years-old.
+
+-   **over_60_hospitalized:** A count representing the number of pneumonia-related hospitalizations for adults over 60-years-old.
+
+-   **under_5_death:** A count representing the number of pneumonia-related deaths for children under 5-years-old.
+
+-   **over_60_death:** A count representing the number of pneumonia-related deaths for adults over 60-years-old.
+
+# Hierarchical Modeling
+
+## Packages
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(reshape2)
+library(lubridate)
+#library(rgdal)
+#library(maptools)
+library(MASS)
+library(rjags)
+library(HDInterval)
+library(ggplot2)
+library(sf)
+#library(spData)
+library(areal)
+library(ggthemes)
+library(gridExtra)
+library(RColorBrewer)
+library(readr)
+#library(wesanderson)
+library(viridis)
+library(ggspatial)
+library(janitor)
+library(forcats)
+```
+
+## Set-Up
+
+```{r}
+
+#Reads data file. Edit to your particular directory. 
+df_hm <- read.csv("/Users/tonybolea/Documents/BDSY/PHM/Peru/peru data/peru.csv")
+
+#Reads data file. Edit to your particular directory. 
+colnames(df_hm) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
+
+
+# Aggregates the number of deaths under 5 years old from pneumonia
+region_year_counts <- df_hm %>%
+  group_by(region, year) %>%  # Group by region and year
+  summarise(mortalities = sum(under_5_death, na.rm = TRUE), .groups = "drop") %>%  
+    # Sum the deaths under 5 and drop grouping to maintain region and years as categories
+  complete(region, year, fill = list(mortalities = 0))  
+      # Ensure all combinations are present with 0 where missing
+
+#Assign numeric IDs for JAGS (make sure to have JAGS installed)
+region_year_counts <- region_year_counts %>%
+  mutate(region_id = as.integer(factor(region)),
+         year_id = as.integer(factor(year)))
+
+# Create JAGS data list
+jdat <- list(
+  N = nrow(region_year_counts),
+  mortalities = region_year_counts$mortalities,
+  region_id = region_year_counts$region_id,
+  year_id = region_year_counts$year_id,
+  n_region = length(unique(region_year_counts$region_id)),
+  n_year = length(unique(region_year_counts$year_id))
+)
+```
+
+## Density Maps
+
+```{r}
+library(rjags)
+source("/Users/tonybolea/Documents/BDSY/PHM/Peru/bdsy-pbh-peru/ModelNorm.R")
+#Set to particular WD. 
+model_path <- "/Users/tonybolea/Documents/BDSY/PHM/Peru/bdsy-pbh-peru/ModelNorm.R"
+
+#ModelNorm.R does the following:
+
+#jcode <- "
+#model {
+#  for (i in 1:N) {
+#    mortalities[i] ~ dpois(lambda[i])
+#    log(lambda[i]) <- mu[region_id[i]] + beta[region_id[i]] * (year_id[i] - mean_year)
+#  }
+#
+#  for (s in 1:n_region) {
+#    mu[s] ~ dnorm(0, 0.001)
+#    beta[s] ~ dnorm(0, 0.001)
+#  }
+#
+#  mean_year <- (n_year + 1) / 2
+#}
+#"
+
+#Code will create regressions to match observed data using Bayes. 
+
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000) # burn-in
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000)
+
+summary(samp)
+
+library(coda)
+par(mar = c(2, 2, 2, 2)) #smaller margins
+plot(samp)
+#Density Plots
+densplot(samp, main = "Posterior Density for Parameters")
+
+posterior_summary <- summary(samp)
+round(posterior_summary$statistics, 3) #Means, SDs
+round(posterior_summary$quantiles, 3) #Creates: 2.5%, 50%, 97.5%
+
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+beta_means <- apply(beta_samples, 2, mean)
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+mu_samples <- as.matrix(samp)[, grep("mu", colnames(as.matrix(samp)))]
+mu_means <- apply(mu_samples, 2, mean)
+mu_ci <- apply(mu_samples, 2, quantile, probs = c(0.025, 0.975))
+
+df <- data.frame(
+  param = colnames(beta_samples), 
+  mean = beta_means, 
+  lower = beta_ci[1, ], 
+  upper = beta_ci[2, ]
+)
+
+library(ggplot2)
+ggplot(df, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+```
+
+## Heat Maps
+
+```{r}
+year_seq <- sort(unique(jdat$year_id))
+region_seq <- 1:jdat$n_region
+mean_year <- (length(year_seq) + 1) / 2
+
+#Create a dataframe of all region-year combinations
+pred_grid <- expand.grid(
+  region = region_seq,
+  year = year_seq
+)
+
+#Predict expcted log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$region] +
+  beta_means[pred_grid$region] * (pred_grid$year - mean_year)
+
+#Back transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+ggplot(pred_grid, aes(x = year, y = factor(region), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nCases", option = "C") +
+  labs(x = "Year", y = "Region", title = "Expected Mortalities by Year and Region") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+library(ggplot2)
+
+#Arrange by population
+ordered_by_population <- c('LIMA', 'PIURA', 'LA LIBERTAD','CAJAMARCA', 'PUNO', 'JUNIN', 'CUSCO', 'AREQUIPA', 'LAMBAYEQUE', 'ANCASH', 'LORETO', 'CALLAO', 'HUANUCO', 'SAN MARTIN', 'ICA', 'AYACUCHO', 'HUANCAVELICA', 'UCAYALI', 'APURIMAC', 'AMAZONAS', 'TACNA', 'PASCO', 'TUMBES', 'MOQUEGUA', 'MADRE DE DIOS')
+
+region_year_counts$region <- factor(region_year_counts$region, levels = ordered_by_population)
+
+ggplot(region_year_counts, aes(x = year, y = region, fill = mortalities)) +
+  geom_tile(color = "white") +
+  geom_vline(xintercept = 2009, linetype = "dashed", color = "white", size = 0.5) +
+  geom_vline(xintercept = 2011, linetype = "dashed", color = "white", size = 0.5) +
+  geom_vline(xintercept = 2015, linetype = "dashed", color = "white", size = 0.5) +
+  # Dummy vline for legend
+  geom_vline(aes(xintercept = Inf, linetype = "2009", color = "2009"), size = 0.5, show.legend = TRUE) +
+  scale_fill_viridis_c(option = "C", name = "Mortalities") +
+  labs(title = "All-Cause Pneumonia Deaths in Children Under 5",
+       x = "Year",
+       y = "Region (Lowest to Highest Population)",
+       color = "PCV Implementation Year",
+       linetype = "PCV Implementation Year") +
+  scale_color_manual(values = c("2009" = "black", "2011" = "black", "2015" = "black")) +
+  scale_linetype_manual(values = c("2009" = "dashed", "2011" = "dashed", "2015" = "dashed")) +
+  guides(color = guide_legend(order = 1), linetype = guide_legend(order = 1)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+    axis.text.y = element_text(size = 6),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    legend.text = element_text(size = 8, angle = 90),
+    legend.title = element_text(size = 10),  # Adjust text size of legend title
+    plot.title = element_text(size = 10),
+    legend.position = "top"  # Move legend to the top
+  )
+
+#model version
+mean_year <- (max(region_year_counts$year_id) + 1) / 2
+
+#Create a data frame with expected log lambda for each serotype-year
+region_year_counts$expected_log_lambda <- mu_means[region_year_counts$region_id] +
+  beta_means[region_year_counts$region_id] * (region_year_counts$year_id - mean_year)
+
+#Convert to expected mortalities (lambda)
+region_year_counts$expected_mortalities <- exp(region_year_counts$expected_log_lambda)
+
+```
+
+# With Interaction Term
+
+Create a new column signifying a calculated mortality rate. Create hierarchical models per region based on this mortality rate. \*\*Does a bad job comparatively.
+
+```{r}
+library(rjags)
+source("/Users/tonybolea/Documents/BDSY/PHM/Peru/bdsy-pbh-peru/ModelNormInteraction.R")
+#Set to particular WD. 
+model_path <- "/Users/tonybolea/Documents/BDSY/PHM/Peru/bdsy-pbh-peru/ModelNormInteraction.R"
+
+#ModelNormInteraction.R does the following:
+
+#jcode <- "
+#model {
+#  for (i in 1:N) {
+ #   mortalities[i] ~ dpois(lambda[i])
+ #   log(lambda[i]) <- mu[region_id[i]] + 
+  #                    beta[region_id[i]] * (year_id[i] - mean_year) +
+ #                     interaction[region_id[i]] * (year_id[i] - mean_year) # Interaction term
+#  }
+#
+ # for (s in 1:n_region) {
+  #  mu[s] ~ dnorm(0, 0.001)
+   # beta[s] ~ dnorm(0, 0.001)
+   # interaction[s] ~ dnorm(0, 0.001)  # Hyperprior for interaction term
+ # }
+#
+# mu_alpha ~ dnorm(0, 0.001)
+# mu_beta ~ dnorm(0, 0.001)
+#
+#  mean_year <- (n_year + 1) / 2
+#}
+#"
+
+#Code will create regressions to match observed data using Bayes. 
+
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000) # burn-in
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000)
+
+summary(samp)
+
+library(coda)
+par(mar = c(2, 2, 2, 2)) #smaller margins
+plot(samp)
+#Density Plots
+densplot(samp, main = "Posterior Density for Parameters")
+
+posterior_summary <- summary(samp)
+round(posterior_summary$statistics, 3) #Means, SDs
+round(posterior_summary$quantiles, 3) #Creates: 2.5%, 50%, 97.5%
+
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+beta_means <- apply(beta_samples, 2, mean)
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+mu_samples <- as.matrix(samp)[, grep("mu", colnames(as.matrix(samp)))]
+mu_means <- apply(mu_samples, 2, mean)
+mu_ci <- apply(mu_samples, 2, quantile, probs = c(0.025, 0.975))
+
+df <- data.frame(
+  param = colnames(beta_samples), 
+  mean = beta_means, 
+  lower = beta_ci[1, ], 
+  upper = beta_ci[2, ]
+)
+
+library(ggplot2)
+ggplot(df, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+```
+
+### Instead by Mortality Rate
+
+### Set-Up
+
+```{r}
+library(rjags)
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+
+# Reads data file. Edit to your particular directory
+df_hm <- read.csv("/Users/tonybolea/Documents/BDSY/PHM/Peru/peru data/peru.csv")
+
+# Rename columns
+colnames(df_hm) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
+
+# Calculate mortalties and cases aggregated by region and year
+region_year_counts <- df_hm %>%
+  group_by(region, year) %>%
+  summarise(
+    mortalities = sum(under_5_death, na.rm = TRUE),
+    cases = sum(under_5_case, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  complete(region, year, fill = list(mortalities = 0, cases = 0))  # Ensure all combinations are present with 0 where missing
+
+# Calculate mortality rate (deaths per 1000 cases)
+region_year_counts <- region_year_counts %>%
+  mutate(mortality_rate = floor((mortalities / cases) * 1000))
+
+# Replace NA values in mortality_rate with 0 (if cases are 0)
+region_year_counts$mortality_rate[is.na(region_year_counts$mortality_rate)] <- 0
+
+# Assign numeric IDs for JAGS
+region_year_counts <- region_year_counts %>%
+  mutate(region_id = as.integer(factor(region)),
+         year_id = as.integer(factor(year)))
+
+# Create JAGS data list
+jdat <- list(
+  N = nrow(region_year_counts),
+  mortality_rate = region_year_counts$mortality_rate,
+  region_id = region_year_counts$region_id,
+  year_id = region_year_counts$year_id,
+  n_region = length(unique(region_year_counts$region_id)),
+  n_year = length(unique(region_year_counts$year_id))
+)
+
+# Verify Data
+head(df_hm)
+head(region_year_counts)
+print(jdat)
+```
+
+### Density Plot
+
+```{r}
+library(rjags)
+source("/Users/tonybolea/Documents/BDSY/PHM/Peru/bdsy-pbh-peru/ModelNormNormalized.R")
+#Set to particular WD. 
+model_path <- "/Users/tonybolea/Documents/BDSY/PHM/Peru/bdsy-pbh-peru/ModelNormNormalized.R"
+
+#ModelNormNormalized.R does the following:
+
+#jcode <- "
+#model {
+#  for (i in 1:N) {
+#    mortality_rate[i] ~ dpois(lambda[i])
+#    log(lambda[i]) <- mu[region_id[i]] + beta[region_id[i]] * (year_id[i] - mean_year)
+#  }
+#
+#  for (s in 1:n_region) {
+#    mu[s] ~ dnorm(mu_alpha, 0.001)
+#    beta[s] ~ dnorm(mu_beta, 0.001)
+#  }
+#
+#   mu_alpha ~ dnorm(0, 0.001)
+#   mu_beta ~ dnorm(0, 0.001)
+#       #inclusion of hyperpriors (creates two level hierarchical model) 
+#
+#  mean_year <- (n_year + 1) / 2
+#}
+#"
+
+#Code will create regressions to match observed data using Bayes. 
+
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000) # burn-in
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000)
+
+summary(samp)
+
+library(coda)
+par(mar = c(2, 2, 2, 2)) #smaller margins
+plot(samp)
+#Density Plots
+densplot(samp, main = "Posterior Density for Parameters")
+
+posterior_summary <- summary(samp)
+round(posterior_summary$statistics, 3) #Means, SDs
+round(posterior_summary$quantiles, 3) #Creates: 2.5%, 50%, 97.5%
+
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+beta_means <- apply(beta_samples, 2, mean)
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+mu_samples <- as.matrix(samp)[, grep("mu", colnames(as.matrix(samp)))]
+mu_means <- apply(mu_samples, 2, mean)
+mu_ci <- apply(mu_samples, 2, quantile, probs = c(0.025, 0.975))
+
+df <- data.frame(
+  param = colnames(beta_samples), 
+  mean = beta_means, 
+  lower = beta_ci[1, ], 
+  upper = beta_ci[2, ]
+)
+
+library(ggplot2)
+ggplot(df, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+```
+
+### Heat Maps By Mortality Rate
+
+```{r}
+year_seq <- sort(unique(jdat$year_id))
+region_seq <- 1:jdat$n_region
+mean_year <- (length(year_seq) + 1) / 2
+
+#Create a dataframe of all region-year combinations
+pred_grid <- expand.grid(
+  region = region_seq,
+  year = year_seq
+)
+
+#Predict expcted log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$region] +
+  beta_means[pred_grid$region] * (pred_grid$year - mean_year)
+
+#Back transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+ggplot(pred_grid, aes(x = year, y = factor(region), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nMortalities", option = "C", limits = c(0, 50)) +
+  labs(x = "Year", y = "Region", title = "Expected Mortalities per 1000 People by Year and Region") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+library(ggplot2)
+
+#Sort for GDP per Capita
+ordered_by_GDP <- c("LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA", "MADRE DE DIOS", "CUSCO", "PASCO", "ANCASH", "LA LIBERTAD", "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI", "LORETO", "CALLAO", "AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO", "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO")
+
+region_year_counts$region <- factor(region_year_counts$region, levels = ordered_by_GDP)
+
+ggplot(region_year_counts, aes(x = year, y = region, fill = mortality_rate)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Mortalities", limits = c(0, 100)) +
+  labs(title = "Mortalities per 1000 Cases by Region and Year",
+       x = "Year",
+       y = "Region (Lowest to Highest GDP Per Capita)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 6),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10))
+
+#model version
+mean_year <- (max(region_year_counts$year_id) + 1) / 2
+
+#Create a data frame with expected log lambda for each serotype-year
+region_year_counts$expected_log_lambda <- mu_means[region_year_counts$region_id] +
+  beta_means[region_year_counts$region_id] * (region_year_counts$year_id - mean_year)
+
+#Convert to expected mortalities (lambda)
+region_year_counts$expected_mortality_rate <- exp(region_year_counts$expected_log_lambda)
+
+library(forcats)
+
+# Updated plot code with legend title "PCV Implementation Year"
+ggplot(region_year_counts, aes(x = year)) + 
+  geom_point(aes(y = mortality_rate), color = "black", alpha = 0.5, size = 0.3) +
+  geom_line(aes(y = expected_mortality_rate, group = region), color = "#8ecae6", size = 0.2) +
+  geom_vline(aes(xintercept = 2009, linetype = "2009", color = "2009"), size = 0.2) +
+  geom_vline(aes(xintercept = 2011, linetype = "2011", color = "2011"), size = 0.2) +
+  geom_vline(aes(xintercept = 2015, linetype = "2015", color = "2015"), size = 0.2) +
+  facet_wrap(~ fct_rev(region), scales = "free") +
+  labs(y = "Mortalities per 1000 People", 
+       x = "Year", 
+       title = "Observed (points) vs Expected (lines) Mortalities per 1000 Cases by Region Ordered from Lowest to Highest GDP Per Capita",
+       linetype = "PCV Implementation Year", color = "PCV Implementation Year") +
+  scale_color_manual(values = c("2009" = "#fb8500", "2011" = "#fb8500", "2015" = "#fb8500")) +
+  scale_linetype_manual(values = c("2009" = "dashed", "2011" = "dashed", "2015" = "dashed")) +
+  ylim(0, 50) +
+  theme_minimal(base_size = 5, base_line_size = 0.1) + 
+  theme(
+    panel.spacing = unit(0.2, "lines"),  # Increase space between panels
+    strip.text = element_text(size = 4),  # Adjust text size for facet titles
+    plot.title = element_text(size = 5, hjust = 0.5)  # Adjust title text
+  )
+
+ggsave("poster_facet.png", dpi = 500)
+```
+
+### Filtered Data Hierarcihcal Models
+
+```{r}
+year_seq <- sort(unique(jdat$year_id))
+region_seq <- 1:jdat$n_region
+mean_year <- (length(year_seq) + 1) / 2
+
+#Create a dataframe of all region-year combinations
+pred_grid <- expand.grid(
+  region = region_seq,
+  year = year_seq
+)
+
+#Predict expcted log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$region] +
+  beta_means[pred_grid$region] * (pred_grid$year - mean_year)
+
+#Back transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+ggplot(pred_grid, aes(x = year, y = factor(region), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nMortalities", option = "C", limits = c(0, 50)) +
+  labs(x = "Year", y = "Region", title = "Expected Mortalities per 1000 People by Year and Region") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+library(ggplot2)
+
+#Sort for GDP per Capita
+ordered_by_GDP <- c("LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA", "MADRE DE DIOS", "CUSCO", "PASCO", "ANCASH", "LA LIBERTAD", "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI", "LORETO", "AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO", "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO")
+  high_gdp <- c("LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA", "MADRE DE DIOS", "CUSCO", "PASCO")
+  moderate_gdp <- c("ANCASH", "LA LIBERTAD", "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI", "LORETO")
+  low_gdp <- c("AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO", "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO")
+
+filtered_data <- region_year_counts %>%
+  filter(!region %in% c("MOQUEGUA", "AREQUIPA", "TACNA", "MADRE DE DIOS", "CUSCO", "PASCO", "ANCASH", "LA LIBERTAD", "TUMBES", "JUNIN", "LAMBAYEQUE", "UCAYALI", "AYACUCHO", "CAJAMARCA", "AMAZONAS", "SAN MARTIN", "APURIMAC", "HUANUCO", "CALLAO", "PIURA", "LORETO"))
+
+filtered_data <- filtered_data %>%
+  mutate(gdp_category = case_when(
+    region %in% high_gdp ~ "High",
+    region %in% moderate_gdp ~ "Moderate",
+    region %in% low_gdp ~ "Low"
+  ))
+
+filtered_data <- filtered_data %>%
+  mutate(gdp_category = factor(gdp_category, levels = c("High", "Moderate", "Low")))
+
+ggplot(region_year_counts, aes(x = year, y = region, fill = mortality_rate)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Mortalities", limits = c(0, 100)) +
+  labs(title = "Mortalities per 1000 People by Region and Year",
+       x = "Year",
+       y = "Region (Lowest to Highest GDP Per Capita)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 6),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10))
+
+#model version
+mean_year <- (max(region_year_counts$year_id) + 1) / 2
+
+#Create a data frame with expected log lambda for each serotype-year
+region_year_counts$expected_log_lambda <- mu_means[region_year_counts$region_id] +
+  beta_means[region_year_counts$region_id] * (region_year_counts$year_id - mean_year)
+
+#Convert to expected mortalities (lambda)
+region_year_counts$expected_mortality_rate <- exp(region_year_counts$expected_log_lambda)
+
+library(forcats)
+
+facet <- ggplot(filtered_data, aes(x = year)) + 
+  geom_point(aes(y = mortality_rate), color = "black", alpha = 0.5, size = 1) +
+  geom_line(aes(y = expected_mortality_rate, group = region), color = "#1f77b4", size = 0.5) +
+  geom_vline(aes(xintercept = 2009, linetype = "2009", color = "2009"), size = 0.5) +
+  geom_vline(aes(xintercept = 2011, linetype = "2011", color = "2011"), size = 0.5) +
+  geom_vline(aes(xintercept = 2015, linetype = "2015", color = "2015"), size = 0.5) +
+  facet_wrap(~ fct_rev(region), scales = "free", ncol = 2) +
+  labs(y = "Mortalities per 1000 Children", 
+       x = "Year", 
+       title = "Observed (points) vs Expected (lines) Mortalities per 1000 Casesa by Region Ordered from Lowest to Highest GDP Per Capita",
+       linetype = "PCV Implementation Year", color = "PCV Implementation Year") +
+  scale_color_manual(values = c("2009" = "#fb8500", "2011" = "#fb8500", "2015" = "#fb8500")) +
+  scale_linetype_manual(values = c("2009" = "dashed", "2011" = "dashed", "2015" = "dashed")) +
+  ylim(0, 50) +
+  theme_minimal(base_size = 10, base_line_size = 0.3) + 
+  theme(
+    panel.spacing = unit(0.2, "lines"),  # Increase space between panels
+    strip.text = element_text(size = 6),  # Adjust text size for facet titles
+    plot.title = element_text(size = 8, hjust = 0.5),  # Adjust title text
+    legend.position = "top",  # Place legend at the top
+    legend.text = element_text(size = 6),  # Adjust the text size of legend entries
+    legend.title = element_text(size = 8)  # Adjust the text size of legend title
+  )
+
+print(facet)
+
+```
+
+```{r}
+ggsave(
+  filename = "poster_facet.png",
+  plot = facet,
+  width = 6,
+  height = 8,
+  units = "in",
+  dpi = 300
+)
+```
