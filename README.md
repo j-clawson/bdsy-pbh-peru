@@ -19,7 +19,7 @@ includes geographically detailed reports of acute respiratory infections collect
 Using negative binomial linear regression, we created continuous models via the interrupted time series method with spline smoothing
 and extrapolated a post-PCV13 counterfactual. 
 
-[View our results here!](TS%20graphs)
+[View our Time Series results here!](TS%20graphs)
 
 
 
@@ -30,7 +30,7 @@ and extrapolated a post-PCV13 counterfactual.
 First, we grouped the data by region and year, and then used the JAGS package in R to enable conditional event-based modeling. This allowed us to predict child mortality trends on a
 local scale, even while some poorer regions (such as Puno) may underreport deaths due to a lack of health infastructure.
 
-![Alt text](Hierarchical-Modeling/Models%20on%20Poster/facet%20with%20mu%20alpha%20and%20mu%20beta%20distributions.png)
+[View our Hierarchical Modeling results here!](Hierarchical-Modeling/Models%20on%20Poster)
 
 
 
@@ -38,8 +38,11 @@ local scale, even while some poorer regions (such as Puno) may underreport death
 
 Using the arulez package in R and the Apriori algorithm, we interpreted and visualized potential associations between a region's GDP and its rate of decline in child mortality.
 
+[View our Association Rule Mining results here!](Market%20Basket%20graphs)
+
+
 
 ## Acknowledgments
 
-As the authors of this project, we would like to thank [Stephanie Perniciaro](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and Shelby Golden ([@sgolde13](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise 
+As the authors of this project, we would like to thank [Stephanie Perniciaro](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and Shelby Golden ([@sgolde13](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise throughout the research process. 
 
