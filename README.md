@@ -17,7 +17,8 @@ includes geographically detailed reports of acute respiratory infections collect
 ### Time Series Analysis
 
 Using negative binomial linear regression, we created continuous models via the interrupted time series method with spline smoothing
-and extrapolated a post-PCV13 counterfactual.
+and extrapolated a post-PCV13 counterfactual. 
+
 ![Alt text](TS%20graphs/PERU_two_panel.png)
 
 
@@ -26,7 +27,7 @@ and extrapolated a post-PCV13 counterfactual.
 
 First, we grouped the data by region and year, and then used the JAGS package in R to enable conditional event-based modeling. This allowed us to predict child mortality trends on a
 local scale, even while some poorer regions (such as Puno) may underreport deaths due to a lack of health infastructure.
-![Alt text](Hierarchical-Modeling/Models%20on%20Poster/facet%20with%20mu%20mu%20alpha%20and%20mu%20beta%20distributions.png)
+![Alt text](Hierarchical-Modeling/Models%20on%20Poster/facet%20with%20mu%20alpha%20and%20mu%20beta%20distributions.png)
 
 ### Association Rule Mining (also called Market Basket Analysis)
 
