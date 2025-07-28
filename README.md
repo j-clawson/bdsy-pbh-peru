@@ -1,7 +1,8 @@
 # Assessing Wealth's Influence on Changes in Child Mortality Across Peru's Regions after PCV13 Implementation
 An analysis of child mortality rate in Peru before and after PCV13 implementation in 2015. The dataset, sourced from RENACE (Peru's national epidemiological network),
 includes geographically detailed reports of acute respiratory infections collected by the national surveillance system from 2000 to 2023.
-<br>
+
+
 > This project was developed as part of the inaugural Big Data Summer Immersion at Yale (BDSY). Our final poster was presented during the Symposium on Big Data, Human Health, and Statistics on July 24, 2025, organized by Dr. Bhramar Mukherjee and the Yale School of Public Health (YSPH).
 
 <br>
