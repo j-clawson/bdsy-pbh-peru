@@ -4,6 +4,7 @@ includes geographically detailed reports of acute respiratory infections collect
 
 > This project was developed as part of the inaugural Big Data Summer Immersion at Yale (BDSY). Our final poster was presented during the Symposium on Big Data, Human Health, and Statistics on July 24, 2025, organized by Dr. Bhramar Mukherjee and the Yale School of Public Health.
 
+<br><br>
 
 
 
@@ -13,6 +14,7 @@ includes geographically detailed reports of acute respiratory infections collect
 - **James Clawson (University of California, Los Angeles)** - [@j-clawson](https://github.com/j-clawson)
 - **Kevin Truong (University of California, Berkeley)** - [@to-ke](https://github.com/to-ke)
 
+<br><br>
 
 
 ## Methods
