@@ -1,0 +1,447 @@
+---
+title: "Market Basket Analysis --> Peru"
+author: "James Clawson"
+date: "2025-07-16"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Market basket analysis, also known as affinity analysis, is an
+unsupervised machine learning technique that uses the Apriori algorithm
+to form associations (rules) between variables in a dataset. It's
+important to note that the variables must be categorical, since the
+algorithm looks for exact matches between when creating rules.
+
+We will be applying this method to look for potential associations between a region's GDP per capita and its rate of mortality decline, offering further insights into whether the two variables are correlated with one another.
+
+## Load the required packages
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+
+# install.packages(c("dplyr", "knitr", "ggplot2", "ggthemes", lubridate", "arules", "arulesViz", "htmltools", plyr", "RColorBrewer", "plotly", "sf", "rnaturalearth", "rnaturalearthdata"))
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(knitr)
+  library(ggplot2)
+  library(ggthemes)
+  library(lubridate)
+  library(arules)
+  library(arulesViz)
+  library(htmltools)
+  library(plyr)
+  library(RColorBrewer)
+  library(plotly)
+  library(sf)
+  library(rnaturalearth)
+  library(rnaturalearthdata)
+})
+
+```
+
+
+## Load the data
+NOTE: Location of csv file may be different, adjust accordingly
+
+```{r}
+peru <- read.csv('data\\peru.csv')
+```
+
+Renaming the columns into English.
+
+```{r}
+colnames(peru) <- c('region', 'province', 'district', 'year', 'week', 'department_code', 'geo_code', 'under_5_noncase', 'under_5_case', 'over_60_case', 'under_5_hospitalized', 'over_60_hospitalized', 'under_5_death', 'over_60_death')
+```
+
+```{r}
+glimpse(peru)
+```
+
+
+## Cleaning the Data
+Let's start by cleaning the data, removing any columns irrelevant to our investigation or attempting to categorize any numerical columns.
+
+Since our focus is on mortality rate in children under 5, let's remove any samples that do not fit this criteria.
+```{r}
+peruClean <- peru %>% 
+  select(-over_60_case, -over_60_hospitalized, -over_60_death, -geo_code, -week, -district, -province, -department_code, -under_5_hospitalized, -under_5_noncase) %>%
+  filter(region != "CALLAO") # no GDP data for Callao
+```
+
+Let's also aggregate the data by year and region, and then create a
+column for mortality rate per 1000 cases, normalizing our data and also
+reducing the total number of transactions.
+
+```{r}
+peruClean <- aggregate(cbind(under_5_death, under_5_case) ~ region + year, data = peruClean, sum)
+peruClean$mortality <- peruClean$under_5_death / peruClean$under_5_case * 1000
+```
+
+
+```{r}
+summary(peruClean$mortality)
+```
+
+
+
+Let's investigate regional mortality rate following 2005 and prior to COVID-19. Both time periods contain inflated mortality rates due to health crises and may complicate our analysis.
+```{r}
+peruClean <- peruClean %>% filter(year < 2020 & year > 2005)
+```
+
+Now we can use our GDP per capita data to plot mortality rates in the wealthiest and poorest regions of Peru using the rnaturalearth package.
+```{r}
+firstGraph <- peruClean %>% 
+  group_by(region) %>% 
+  summarise("Deaths Per 1000 Cases" = mean(mortality)) %>%
+  arrange(desc(`Deaths Per 1000 Cases`))
+
+highestFive <- firstGraph %>% slice_head(n = 6)
+lowestFive <- firstGraph %>% slice_tail(n = 6)
+tenRegions <- rbind(highestFive, lowestFive)
+
+region_coords <- data.frame(
+  lat = c(
+  -15.8433,  # PUNO
+  -12.7864,  # HUANCAVELICA
+  -11.0000,  # JUNIN
+  -13.5300,  # CUSCO
+  -13.1600,  # AYACUCHO
+  -10.6667,  # PASCO
+  -7.2000,   # SAN MARTIN
+  -3.5700,   # TUMBES
+  -16.4000,  # AREQUIPA
+  -12.0500,  # LIMA
+  -14.0700,  # ICA
+  -6.7500),
+  lon = c(
+  -70.0236,  # PUNO
+  -74.9756,  # HUANCAVELICA
+  -75.0000,  # JUNIN
+  -71.9800,  # CUSCO
+  -76.0833,  # PASCO
+  -76.8000,  # SAN MARTIN
+  -74.2200,  # AYACUCHO
+  -80.4600,  # TUMBES
+  -71.5400,  # AREQUIPA
+  -77.0400,  # LIMA
+  -75.7400,  # ICA
+  -79.8400   # LAMBAYEQUE
+))
+
+tenRegions <- cbind(tenRegions, region_coords)
+tenRegions$colorGroup <- c(rep("Bottom 6 Regions \nby GDP Per Capita", 3), "Top 6 Regions \nby GDP Per Capita", "Bottom 6 Regions \nby GDP Per Capita", "Top 6 Regions \nby GDP Per Capita", "Bottom 6 Regions \nby GDP Per Capita", rep("Top 6 Regions \nby GDP Per Capita", 4), "Bottom 6 Regions \nby GDP Per Capita" )
+```
+
+Let's make the map!
+```{r}
+peruMap <- ne_states(country = "Peru", returnclass = "sf")
+mortality_sf <- st_as_sf(tenRegions, coords = c("lon", "lat"), crs = 4326)
+
+mortalityMap <- ggplot(data = peruMap) +
+  geom_sf(aes(fill = name), show.legend = FALSE) +
+  scale_fill_manual(values = c(
+  "San Martín"   = "#E0AD4E",  # orange
+  "Loreto"       = "#F6E97A",  # light yellow
+  "Amazonas"     = "#F1DD5B",  # light yellow
+  "Cajamarca"    = "#D0B52C",  # mustard
+  "Piura"        = "#BFE090",  # pale green
+  "La Libertad"  = "#D8F2B0",  # pale green
+  "Lambayeque"   = "#ADC773",  # green
+  "Tumbes"       = "#A4C977",  # green
+  "Ancash"       = "#D6EFB3",  # light green
+  "Lima"         = "#A4D4A3",  # light green
+  "Lima Province"= "#A4D4A3",  # light green
+  "Callao"       = "#86B792",  # muted green
+  "Ica"          = "#DEEDA1",  # light green
+  "Arequipa"     = "#B7E296",  # green
+  "Tacna"        = "#F2E47A",  # blue
+  "Moquegua"     = "#B7E296",  # teal
+  "Puno"         = "#F2E47A",  # dark blue
+  "Cusco"        = "#D0E78F",  # light green
+  "Ayacucho"     = "#C4E2A2",  # green
+  "Apurímac"     = "#A0D175",  # green
+  "Huancavelica" = "#B9DB93",  # green
+  "Junín"        = "#A2CE7D",  # green
+  "Pasco"        = "#BDD68D",  # green
+  "Huánuco"      = "#D2E294",  # green
+  "Ucayali"      = "#F2E47A",  # pale yellow
+  "Madre de Dios"= "#9AC15A"   # green
+), na.value = "#D6EFB3") +
+ # theme(legend.position = "None") +
+  geom_sf(data = mortality_sf, aes(size = `Deaths Per 1000 Cases`, color = colorGroup), alpha = 0.75) +
+  scale_size_continuous(range = c(5, 11)) +
+  scale_color_manual(values = c("Bottom 6 Regions \nby GDP Per Capita" = "darkblue", "Top 6 Regions \nby GDP Per Capita" = "#C70039")) +
+  labs(
+    title = "Child Pneumococcal Mortality Rates in Peru's \nWealthiest and Poorest Regions (2000-2023)",
+    color = "GDP Per Capita Grouping",
+    size = "Deaths per 1,000 Cases"
+  ) + 
+  theme_minimal() +
+  guides(color = guide_legend(override.aes = list(size = 6))) +
+  theme(
+    legend.key.size = unit(1.845, "lines"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    plot.title = element_text(face = "bold", size = 17.5, hjust = 0.5),
+    legend.background = element_rect(fill = "white", color = "black", size = 0.5, linetype = "solid"),
+    legend.key = element_rect(fill = "white", color = NA),
+    legend.text = element_text(size = 10),
+    legend.box.margin = margin(0, 2, 0, 2, unit = "mm")
+  ) 
+
+mortalityMap
+  
+# optional argument to save the output
+# ggsave("mortalityMap.png", plot = mortalityMap, width = 4.32, height = 6, units = "in", dpi = 300)
+```
+
+## Categorizing Relative Mortality Decline
+
+```{r}
+mortality_change <- peruClean %>%
+  arrange(region, year) %>%
+  group_by(region) %>%
+  mutate(
+    absolute_change = mortality - lag(mortality),
+    relative_change = (mortality - lag(mortality)) / lag(mortality)
+  ) %>%
+  ungroup()
+
+thresholds <- mortality_change %>%
+  group_by(region) %>%
+  summarise(
+    q1 = quantile(relative_change, 0.25, na.rm = TRUE),
+    q2 = quantile(relative_change, 0.50, na.rm = TRUE), # median
+    q3 = quantile(relative_change, 0.75, na.rm = TRUE),
+    min_val = min(relative_change, na.rm = TRUE),
+    max_val = max(relative_change, na.rm = TRUE)
+  )
+
+mortality_change <- mortality_change %>%
+  left_join(thresholds, by = "region") %>%
+  mutate(
+    rel_change_cat = case_when(
+      relative_change < q1 ~ "Low Rate of Mortality Decline",
+      relative_change < q3 ~ "Moderate Rate of Mortality Decline",
+      TRUE ~ "High Rate of Mortality Decline"
+    )
+  ) 
+
+mortality_change <- mortality_change %>% select(-max_val, -min_val, -q1, -q2, -q3)
+```
+
+## Categorizing Absolute Mortality Decline
+
+```{r}
+thresholds <- mortality_change %>%
+  group_by(region) %>%
+  summarise(
+    q1 = quantile(absolute_change, 0.25, na.rm = TRUE),
+    q2 = quantile(absolute_change, 0.50, na.rm = TRUE), # median
+    q3 = quantile(absolute_change, 0.75, na.rm = TRUE),
+    min_val = min(absolute_change, na.rm = TRUE),
+    max_val = max(absolute_change, na.rm = TRUE)
+  )
+
+mortality_change <- mortality_change %>%
+  left_join(thresholds, by = "region") %>%
+  mutate(
+    absolute_change_cat = case_when(
+      absolute_change < q1 ~ "Low Absolute Change",
+      absolute_change < q3 ~ "Moderate Absolute Decline",
+      TRUE ~ "High Absolute Decline"
+    )
+  ) 
+
+mortality_change <- mortality_change %>% select(-max_val, -min_val, -q1, -q2, -q3, -absolute_change)
+```
+
+```{r}
+glimpse(mortality_change)
+```
+
+```{r}
+gdp_ordered_regions <- c("LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA", "MADRE DE DIOS", "CUSCO", "PASCO", "ANCASH", "LA LIBERTAD", "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI", "LORETO", "AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO", "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO")
+
+third <- ceiling(length(gdp_ordered_regions)/3)
+gdp_categories <- rep(c("High GDP Region", "Moderate GDP Region", "Low GDP Region"), times = c(8, 8, 8))
+
+gdp_df <- data.frame(
+  region = gdp_ordered_regions,
+  gdp_category = gdp_categories
+)
+
+peruClean <- merge(mortality_change, gdp_df, by = "region", all.x = TRUE)
+peruClean$gdp_category <- factor(peruClean$gdp_category, levels = c("Low GDP Region", "Moderate GDP Region", "High GDP Region"))
+
+# Total deaths broken up by GDP
+totalLook <- peruClean %>% group_by(gdp_category) %>% summarise("Total Deaths" = sum(under_5_death))
+                                                                
+totalLook
+```
+
+## Plotting Total Deaths by GDP Category
+```{r}
+attempt1 <- peruClean %>% filter(year > 2005) %>% group_by(year, gdp_category) %>% summarise("avg_mortality" = mean(mortality))
+
+
+mortalityPlot <- ggplot(attempt1, aes(x = year, y = avg_mortality, fill = gdp_category)) + 
+  geom_bar(stat = "identity", position = position_dodge(), show.legend = FALSE) + 
+  geom_vline(aes(xintercept = 2015, color = "PCV13 Implementation"), linetype = "dashed", size = 0.75, show.legend = TRUE) + 
+  scale_color_manual(name = NULL, values = c("PCV13 Implementation" = "black")) + 
+  coord_cartesian(ylim = c(0, 40)) +
+  facet_wrap(~gdp_category, nrow = 1) +
+  labs(
+    title = "Trends in Under-5 Pneumococcal Mortality in Peru (2006-2019)",
+    subtitle = "Faceted by Regional GDP Per Capita",
+    x = "Year",
+       y = "Deaths per 1,000 cases"
+    ) +
+  guides(fill = "none") +
+  scale_fill_tableau(palette = "Tableau 10") +
+  theme(
+    legend.position = "top",
+    legend.text = element_text(size = 11),
+    panel.spacing = unit(2.4, "lines"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 13),
+    strip.text = element_text(size = 15),
+    plot.title = element_text(hjust = 0.5, size = 17.5),
+    plot.subtitle = element_text(hjust = 0.5, size = 16),
+    axis.title = element_text(size = 13),
+    panel.grid.minor = element_blank()
+  )
+ 
+mortalityPlot  
+  
+# optional argument to save the output
+# ggsave("mortalityPlot.png", plot = mortalityPlot, width = 9, height = 9, units = "in", dpi = 300)
+```
+
+Now let's break up the dataset based on pre and post pcv13 implementation, which occurred in 2015. Let's also ensure we don't include any rows where the death count is zero, which would introduce a divide by zero error when accounting for relative change.
+```{r}
+prePeru <- peruClean %>% filter(year > 2006 & year < 2015) %>% select(-year, -region, -under_5_death, -under_5_case, -mortality, -relative_change)
+postPeru <- peruClean %>% filter(year >= 2015) %>% select(-year, -region, -under_5_death, -under_5_case, -mortality, -relative_change)
+```
+
+Finally, we can transform our data into a list of transactions
+```{r}
+trPre <- as(prePeru, "transactions")
+trPost <- as(postPeru, "transactions")
+```
+
+First, let's focus on pre-PCV13 implementation
+```{r}
+print("Description of the transactions")
+summary(trPre)
+```
+
+Which items occur most frequently? There are two approaches.
+
+1)  Absolute Count
+
+```{r}
+itemFrequencyPlot(trPre, topN=25,type="absolute", col=brewer.pal(8, "Pastel2"),main = "prePeru transaction count")
+```
+
+2)  Relative Frequency
+
+```{r}
+itemFrequencyPlot(trPre, topN=25,type="relative", col=brewer.pal(8, "Pastel2"), main = "gpsClean transaction count")
+```
+
+## Create rules
+
+Finally, let's use the Apriori algorithm from the arules package to look
+for itemsets
+
+We will raise our support threshold to 0.01 to limit the number of
+computations and our confidence threshold to 0.2.
+
+```{r}
+rulesPre <- apriori(trPre, parameter = list(supp = 0.01, confidence = 0.2), control = list(verbose = TRUE))
+
+
+rulesPre <- subset(
+  rulesPre,
+  subset = size(lhs) == 1 &
+    lhs %pin% "gdp"
+)
+  
+rulesPre <- sort(rulesPre, by = "lift", decreasing = TRUE)
+
+summary(rulesPre)
+```
+
+Now let's inspect our rules!
+
+```{r}
+inspect(rulesPre)
+preGraph1 <- rulesPre[c(3, 4, 14, 15)]
+```
+
+Prior to vaccinaton, poorer regions seemingly declined at a moderate rate than their wealthier counterparts.
+```{r}
+plot(preGraph1, method = "graph", engine = "htmlwidget")
+```
+
+
+Now let's examine our post-vaccination rules
+```{r}
+rulesPost <- apriori(trPost, parameter = list(supp = 0.01, confidence = 0.2), control = list(verbose = TRUE))
+
+rulesPost <- subset(
+  rulesPost,
+  subset = size(lhs) == 1 &
+    lhs %pin% "gdp"
+)
+
+rulesPost <- sort(rulesPost, by = "lift", decreasing = TRUE)
+summary(rulesPost)
+```
+
+```{r}
+inspect(rulesPost)
+postGraph1 <- rulesPost[c(3, 4, 16, 18)]
+```
+
+However, post-vaccination, poorer regions seem to decline at a lower rate, both relatively and absolutely.
+```{r}
+plot(postGraph1, method = "graph", engine = "htmlwidget")
+```
+
+Finally, let's change the item labels so it's easier to visualize the rules
+```{r}
+items1 <- itemLabels(preGraph1)
+clean_items1 <- gsub("^[^=]+=", "", items1)
+itemLabels(preGraph1) <- clean_items1
+
+items2 <- itemLabels(postGraph1)
+clean_items2 <- gsub("^[^=]+=", "", items2)
+itemLabels(postGraph1) <- clean_items2
+```
+
+Finally, let's plot both rules side-by-side!
+```{r}
+prePlot <- plot(preGraph1, method = "graph", engine = "htmlwidget")
+postPlot <- plot(postGraph1, method = "graph", engine = "htmlwidget")
+
+browsable(
+  tagList(
+    tags$div(style = "display: inline-block; width: 49%; vertical-align: top;", prePlot),
+    tags$div(style = "display: inline-block; width: 49%; vertical-align: top;", postPlot)
+  )
+)
+```
