@@ -2,7 +2,7 @@
 An analysis of child mortality rate in Peru before and after PCV13 implementation in 2015. The dataset, sourced from RENACE (Peru's national epidemiological network),
 includes geographically detailed reports of acute respiratory infections collected by the national surveillance system from 2000 to 2023.
 
-> This project was developed as part of the inaugural Big Data Summer Immersion at Yale (BDSY). Our final poster was presented during the Symposium on Big Data, Human Health, and Statistics on July 24, 2025, organized by Dr. Bhramar Mukherjee and the Yale School of Public Health.
+> This project was developed as part of the inaugural Big Data Summer Immersion at Yale (BDSY). Our final poster was presented during the Symposium on Big Data, Human Health, and Statistics on July 24, 2025, organized by Dr. Bhramar Mukherjee and the Yale School of Public Health (YSPH).
 
 <br>
 
@@ -51,6 +51,6 @@ Using the arulez package in R and the Apriori algorithm, we interpreted and visu
 
 ## Acknowledgments
 
-As the authors of this project, we would like to thank [Stephanie Perniciaro](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and [Shelby Golden](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise throughout the research process.
+As the authors of this project, we would like to thank [Stephanie Perniciaro](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and [Shelby Golden](https://github.com/sgolde13) at the Yale School of Public Health for their mentorship and expertise throughout the research process.
 
-We are also grateful for the support offered by Dr. Bhramar Mukherjee, Jackson Higginbottom, and the rest of the 2025 BDSY team.
+We are also grateful for the support offered by [Dr. Bhramar Mukherjee](https://www.linkedin.com/in/bhramar-mukherjee-483810320/) (Associate Dean of Data Science & Data Equity), [Jackson Higginbottom] (https://www.linkedin.com/in/jacksonhigg/) (YSPH Program Manager), and the rest of the 2025 BDSY team.
