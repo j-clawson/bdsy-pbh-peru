@@ -23,15 +23,21 @@ and extrapolated a post-PCV13 counterfactual.
 
 
 
+
+
 ### Hierarchical Modeling
 
 First, we grouped the data by region and year, and then used the JAGS package in R to enable conditional event-based modeling. This allowed us to predict child mortality trends on a
 local scale, even while some poorer regions (such as Puno) may underreport deaths due to a lack of health infastructure.
+
 ![Alt text](Hierarchical-Modeling/Models%20on%20Poster/facet%20with%20mu%20alpha%20and%20mu%20beta%20distributions.png)
+
+
 
 ### Association Rule Mining (also called Market Basket Analysis)
 
-Using the arulez package in R and the Apriori algorithm, we interpreted and visualized potential association between a region's GDP and its rate of decline in child mortality.
+Using the arulez package in R and the Apriori algorithm, we interpreted and visualized potential associations between a region's GDP and its rate of decline in child mortality.
+
 
 ## Acknowledgments
 
