@@ -5,6 +5,6 @@ and association rule mining (also known as market basket analysis).
 
 ## Authors (in alphabetical order)
 
-- **Antonio Bolea (Yale University)** - [@antoniomvega] (https://github.com/antoniomvega)
-- **James Clawson (University of California, Los Angeles)** - [@j-clawson] (https://github.com/j-clawson)
-- **Kevin Truong (University of California, Berkeley)** - [@to-ke] (https://github.com/to-ke)
+- **Antonio Bolea (Yale University)** - [@antoniomvega](https://github.com/antoniomvega)
+- **James Clawson (University of California, Los Angeles)** - [@j-clawson](https://github.com/j-clawson)
+- **Kevin Truong (University of California, Berkeley)** - [@to-ke](https://github.com/to-ke)
