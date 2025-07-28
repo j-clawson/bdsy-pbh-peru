@@ -3,6 +3,7 @@ An analysis of child mortality rate in Peru before and after PCV13 implementatio
 includes geographically detailed reports of acute respiratory infections collected by the national surveillance system from 2000 to 2023. The project is primarily coded in R.
 
 
+
 ## Authors (in alphabetical order)
 
 - **Antonio Bolea (Yale University)** - [@antoniomvega](https://github.com/antoniomvega)
@@ -10,16 +11,22 @@ includes geographically detailed reports of acute respiratory infections collect
 - **Kevin Truong (University of California, Berkeley)** - [@to-ke](https://github.com/to-ke)
 
 
+
 ## Methods
 
 ### Time Series Analysis
 
 Using negative binomial linear regression, we created continuous models via the interrupted time series method with spline smoothing
-and extrapolated a post-PCV13 counterfactual. [View the results!](./'TS graphs'/)
+and extrapolated a post-PCV13 counterfactual.
+![Alt text](TS%20graphs/PERU_two_panel.png)
+
+
 
 ### Hierarchical Modeling
 
-First, we grouped the data by region and year, and then used the JAGS package in R to enable conditional event-based modeling 
+First, we grouped the data by region and year, and then used the JAGS package in R to enable conditional event-based modeling. This allowed us to predict child mortality trends on a
+local scale, even while some poorer regions (such as Puno) may underreport deaths due to a lack of health infastructure.
+![Alt text](Hierarchical-Modeling/Models%20on%20Poster/facet%20with%20mu%20mu%20alpha%20and%20mu%20beta%20distributions.png)
 
 ### Association Rule Mining (also called Market Basket Analysis)
 
@@ -27,5 +34,5 @@ Using the arulez package in R and the Apriori algorithm, we interpreted and visu
 
 ## Acknowledgments
 
-As the authors of this project, we would like to thank Stephanie Perniciaro [(LinkedIn)](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and Shelby Golden ([@sgolde13](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise 
+As the authors of this project, we would like to thank [Stephanie Perniciaro](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and Shelby Golden ([@sgolde13](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise 
 
