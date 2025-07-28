@@ -4,6 +4,7 @@ includes geographically detailed reports of acute respiratory infections collect
 
 
 
+
 ## Authors (in alphabetical order)
 
 - **Antonio Bolea (Yale University)** - [@antoniomvega](https://github.com/antoniomvega)
