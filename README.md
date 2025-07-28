@@ -19,7 +19,7 @@ includes geographically detailed reports of acute respiratory infections collect
 Using negative binomial linear regression, we created continuous models via the interrupted time series method with spline smoothing
 and extrapolated a post-PCV13 counterfactual. 
 
-![View our result here!](TS%20graphs)
+[View our results here!](TS%20graphs)
 
 
 
