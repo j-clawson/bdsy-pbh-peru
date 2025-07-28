@@ -15,6 +15,7 @@ includes geographically detailed reports of acute respiratory infections collect
 - **James Clawson (University of California, Los Angeles)** - [@j-clawson](https://github.com/j-clawson)
 - **Kevin Truong (University of California, Berkeley)** - [@to-ke](https://github.com/to-ke)
 
+<br>
 
 
 ## Methods
