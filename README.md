@@ -15,7 +15,6 @@ includes geographically detailed reports of acute respiratory infections collect
 - **James Clawson (University of California, Los Angeles)** - [@j-clawson](https://github.com/j-clawson)
 - **Kevin Truong (University of California, Berkeley)** - [@to-ke](https://github.com/to-ke)
 
-<br>
 
 
 ## Methods
@@ -52,5 +51,5 @@ Using the arules package in R and the Apriori algorithm, we interpreted and visu
 
 ## Acknowledgments
 
-We would also like to thank Stephanie Perniciaro and Shelby Golden at the Yale School of Public Health (YSPH) for their mentorship and exertise throughout the duration of the research process. We are also grateful for the support offered by Dr. Bhramar Mukherjee (Associate Dean fo Data Science & Data Equity at Yale), Jackson Higginbottom (YSPH Program Manager), and the rest of the 2025 BDSY team. Finally, we acknowledge and appreciate the developers behind the **JAGS** and **arules** packages in R for providing the tools that enabled our analysis.
+We would like to thank Stephanie Perniciaro and Shelby Golden at the Yale School of Public Health (YSPH) for their mentorship and exertise throughout the duration of the research process. We are also grateful for the support offered by Dr. Bhramar Mukherjee (Associate Dean fo Data Science & Data Equity at Yale), Jackson Higginbottom (YSPH Program Manager), and the rest of the 2025 BDSY team. Finally, we acknowledge and appreciate the developers behind the **JAGS** and **arules** packages in R for providing the tools that enabled our analysis.
 
