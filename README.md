@@ -21,9 +21,7 @@ Using negative binomial linear regression, we created continuous models via the 
 and extrapolated a post-PCV13 counterfactual. 
 
 [View our Time Series results here!](TS%20graphs)
-
-
-<div style="margin-bottom: 20px;"></div>
+<br><br>
 
 
 
@@ -34,7 +32,7 @@ First, we grouped the data by region and year, and then used the JAGS package in
 local scale, even while some poorer regions (such as Puno) may underreport deaths due to a lack of health infastructure.
 
 [View our Hierarchical Modeling results here!](Hierarchical-Modeling/Models%20on%20Poster)
-
+<br><br>
 
 
 ### Association Rule Mining (also called Market Basket Analysis)
@@ -42,6 +40,8 @@ local scale, even while some poorer regions (such as Puno) may underreport death
 Using the arulez package in R and the Apriori algorithm, we interpreted and visualized potential associations between a region's GDP and its rate of decline in child mortality.
 
 [View our Association Rule Mining results here!](Market%20Basket%20graphs)
+<br><br><br>
+
 
 
 
