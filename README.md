@@ -3,7 +3,7 @@ An analysis of child mortality rate in Peru before and after PCV13 implementatio
 includes geographically detailed reports of acute respiratory infections collected by the national surveillance system from 2000 to 2023.
 
 
-> This project was developed as part of the inaugural Big Data Summer Immersion at Yale (BDSY). Our final poster was presented during the Symposium on Big Data, Human Health, and Statistics on July 24, 2025, organized by Dr. Bhramar Mukherjee and the Yale School of Public Health (YSPH).
+> This project was developed as part of the inaugural *Big Data Summer Immersion at Yale* (BDSY). Our final poster was presented during the *Symposium on Big Data, Human Health, and Statistics* on July 24, 2025, organized by Dr. Bhramar Mukherjee and the Yale School of Public Health.
 
 <br>
 
@@ -52,8 +52,5 @@ Using the arules package in R and the Apriori algorithm, we interpreted and visu
 
 ## Acknowledgments
 
-As the authors of this project, we would like to thank [Stephanie Perniciaro](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and [Shelby Golden](https://github.com/sgolde13) at the Yale School of Public Health for their mentorship and expertise throughout the research process.
+We would also like to thank Stephanie Perniciaro and Shelby Golden at the Yale School of Public Health (YSPH) for their mentorship and exertise throughout the duration of the research process. We are also grateful for the support offered by Dr. Bhramar Mukherjee (Associate Dean fo Data Science & Data Equity at Yale), Jackson Higginbottom (YSPH Program Manager), and the rest of the 2025 BDSY team. Finally, we acknowledge and appreciate the developers behind the **JAGS** and **arules** packages in R for providing the tools that enabled our analysis.
 
-We are also grateful for the support offered by [Dr. Bhramar Mukherjee](https://www.linkedin.com/in/bhramar-mukherjee-483810320/) (Associate Dean of Data Science & Data Equity), [Jackson Higginbottom](https://www.linkedin.com/in/jacksonhigg/) (YSPH Program Manager), and the rest of the 2025 BDSY team.
-
-Finally, we acknowledge and thank the developers behind the JAGS and arules packages in R for providing the tools that enabled our analysis.
