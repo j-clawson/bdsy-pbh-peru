@@ -27,5 +27,5 @@ Using the arulez package in R and the Apriori algorithm, we interpreted and visu
 
 ## Acknowledgments
 
-As the authors of this project, we would like to thank Stephanie Perniciaro [LinkedIn](https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and Shelby Golden ([@sgolde13](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise 
+As the authors of this project, we would like to thank Stephanie Perniciaro ([LinkedIn])(https://www.linkedin.com/in/stephanie-perniciaro-72789548/) and Shelby Golden ([@sgolde13](https://github.com/sgolde13)) at the Yale School of Public Health for their mentorship and expertise 
 
