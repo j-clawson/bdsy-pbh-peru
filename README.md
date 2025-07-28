@@ -26,6 +26,8 @@ and extrapolated a post-PCV13 counterfactual.
 
 
 
+
+
 ### Hierarchical Modeling
 
 First, we grouped the data by region and year, and then used the JAGS package in R to enable conditional event-based modeling. This allowed us to predict child mortality trends on a
