@@ -105,9 +105,9 @@ Getting estimated dates for vaccine implementation. Set as July 1 of the year it
 
 ```{r}
 # Estimation when PCV7, PCV10 and PCV13 was introduced
-pcv7.intro.date <- as.Date('2009-07-01')
-pcv10.intro.date <- as.Date('2011-07-01')
-pcv13.intro.date <- as.Date('2013-07-01')
+pcv7_intro_date <- as.Date('2009-07-01')
+pcv10_intro_date <- as.Date('2011-07-01')
+pcv13_intro_date <- as.Date('2015-07-01')
 
 
 ```
@@ -155,7 +155,7 @@ Simple time series of death counts in \<5 yo and \>60 yo.
 
 #Legend for vaccine implementation dates
 vaccine_dates <- tibble(
-  date    = c(pcv7.intro.date, pcv10.intro.date, pcv13.intro.date),
+  date    = c(pcv7_intro_date, pcv10_intro_date, pcv13_intro_date),
   vaccine = c("PCV7", "PCV10", "PCV13"),
   levels = c("PCV7", "PCV10", "PCV13"))
 
@@ -224,73 +224,12 @@ deaths_hist <- hist(Total_Deaths, breaks=8,
                     col="darkmagenta")
 
 ```
+
 ```{r}
 head(deaths_by_region)
 ```
 
 ## Regional EDA
-Visualizing the number of deaths by region
-
-```{r}
-
-
-p3 <- ggplot(deaths_by_region, 
-             aes(x = reorder(region, total_deaths), y = total_deaths)) +
-  geom_col(fill = "skyblue") +
-  labs(
-    title = "Total <5 Deaths by Region",
-    x = "Region",
-    y = "Total <5 Deaths"
-  ) +
-  theme_minimal() + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
-
-p3
-```
-```{r}
-gdp_pc_order <- c(
-  "LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA",
-  "MADRE DE DIOS", "CUSCO", "PASCO", "ANCASH", "LA LIBERTAD",
-  "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI",
-  "LORETO", "AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO",
-  "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO"
-)
-
-# 2) Compute death rate and re‐factor region
-df_plot <- deaths_by_region %>%
-  filter(region != "CALLAO") %>%
-  mutate(
-    death_rate = total_deaths / total_cases,
-    region     = factor(region, levels = gdp_pc_order[ gdp_pc_order!="CALLAO" ])
-  )
-
-# 3) Draw the bar chart
-p3 <- ggplot(df_plot, aes(x = region, y = death_rate)) +
-  geom_col(fill = "#fb8500") +
-  labs(
-    title = "<5 Mortality Rate by Region",
-    x     = "Region (ordered by GDP per capita, richest→poorest)",
-    y     = "Mortality rate (deaths ÷ cases)"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
-  )
-p3
-```
-```{r}
-ggsave(
-  filename = "Regions_mortality_rate.png",
-  plot     = p3,
-  width    = 12,
-  height   = 5,
-  units    = "in",
-  dpi      = 300
-)
-```
-
-
-Aggregate weekly counts as monthly counts, indexed by the start of that month. (copied from above, can delete)
 
 ```{r}
 df_region <- peru[c("year","week", "region", "under_5_death", "under_5_case")]
@@ -317,6 +256,96 @@ df_region <- df_region %>%
     under5_cases = sum(under_5_cases, na.rm = TRUE),
     .groups = "drop"
   )
+```
+
+Visualizing the number of deaths by region
+
+```{r}
+
+
+p3 <- ggplot(deaths_by_region, 
+             aes(x = reorder(region, total_deaths), y = total_deaths)) +
+  geom_col(fill = "skyblue") +
+  labs(
+    title = "Total <5 Deaths by Region",
+    x = "Region",
+    y = "Total <5 Deaths"
+  ) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+
+p3
+```
+
+```{r}
+# 1. Define region groups
+high_wealth   <- c("LIMA", "MOQUEGUA", "ICA", "AREQUIPA", "TACNA", "MADRE DE DIOS", "CUSCO", "PASCO")
+moderate_wealth <- c("ANCASH", "LA LIBERTAD", "TUMBES", "PIURA", "JUNIN", "LAMBAYEQUE", "UCAYALI", "LORETO")
+low_wealth    <- c("AYACUCHO", "CAJAMARCA", "AMAZONAS", "PUNO", "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO")
+
+# 2. Add GDP category to df_plot
+df_plot <- deaths_by_region %>%
+  filter(region != "CALLAO") %>%
+  mutate(
+    death_rate = (total_deaths / total_cases) * 1000,
+    region     = factor(region, levels = gdp_pc_order[gdp_pc_order != "CALLAO"]),
+    gdp_cat = case_when(
+      region %in% high_wealth      ~ "High",
+      region %in% moderate_wealth  ~ "Moderate",
+      region %in% low_wealth       ~ "Low",
+      TRUE                        ~ NA_character_
+    ),
+    gdp_cat = factor(gdp_cat, levels = c("High", "Moderate", "Low"))
+  )
+
+# 3. Draw the colored bar chart
+line_df <- data.frame(line_label = "National Average", y = peru_mortality)
+
+p3 <- ggplot(df_plot, aes(x = region, y = death_rate, fill = gdp_cat)) +
+  geom_col() +
+  geom_hline(
+    data = line_df,
+    aes(yintercept = y, color = line_label),
+    linetype = "dashed",
+    size = 1,
+    show.legend = TRUE
+  ) +
+  scale_fill_manual(
+    values = c("High" = "#D62728", "Moderate" = "#FF7F0E", "Low" = "#1F77B4"),
+    name = "GDP per Capita"
+  ) +
+  scale_color_manual(
+    values = c("National Average" = "black"),
+    name = NULL
+  ) +
+  guides(
+    fill = guide_legend(order = 1, override.aes = list(linetype = 0, color = NA)),
+    color = guide_legend(order = 2)
+  ) +
+  labs(
+    title = "<5 yo Average Mortality Rate Per Thousand by Region (2000-2023)",
+    x     = "Region (ordered by GDP per capita, richest→poorest)",
+    y     = "Mortality rate per thousand"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    legend.position = "top"
+  )
+
+p3
+  
+```
+
+```{r}
+ggsave(
+  filename = "Regions_mortality_rate.png",
+  plot     = p3,
+  width    = 7,
+  height   = 3,
+  units    = "in",
+  dpi      = 300
+)
 ```
 
 making a line plot of deaths by month and region
