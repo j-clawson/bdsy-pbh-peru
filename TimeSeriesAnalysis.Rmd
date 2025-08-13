@@ -1,7 +1,7 @@
 ---
 title: "Time Series Analysis of Peru and its Region's Pneumonia Death Counts"
 author: "James Clawson, Antonio Bolea, Kevin Truong"
-date: 6/54/2025
+date: 8/`2/2025
 date-format: long
 format:
   html:
