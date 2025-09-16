@@ -9,7 +9,7 @@ includes geographically detailed reports of acute respiratory infections collect
 
 
 
-## Authors (in alphabetical order)
+## Authors (alphabetical)
 
 - **Antonio Bolea (Yale University)** - [@antoniomvega](https://github.com/antoniomvega)
 - **James Clawson (University of California, Los Angeles)** - [@j-clawson](https://github.com/j-clawson)

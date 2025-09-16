@@ -1,7 +1,7 @@
 ---
 title: "Time Series Analysis of Peru and its Region's Pneumonia Death Counts"
 author: "James Clawson, Antonio Bolea, Kevin Truong"
-date: 6/54/2025
+date: 8/`2/2025
 date-format: long
 format:
   html:
@@ -73,7 +73,7 @@ Getting estimated dates for vaccine implementation. Set as July 1 of the year it
 # Estimation when PCV7, PCV10 and PCV13 was introduced
 pcv7_intro_date <- as.Date('2009-07-01')
 pcv10_intro_date <- as.Date('2011-07-01')
-pcv13_intro_date <- as.Date('2013-07-01')
+pcv13_intro_date <- as.Date('2015-07-01')
 
 ```
 
@@ -327,6 +327,16 @@ df_pred_spl <- df_pred_spl %>%
 
 ```
 
+```{r}
+# Getting max value to have y-axis the same
+ymax_spline <- max(
+  df_pred_spl$under5_deaths,
+  df_pred_spl$pred.spl,
+  df_pred_spl$conf.high,
+  na.rm = TRUE
+)
+```
+
 Plot the model.
 
 ```{r}
@@ -347,7 +357,7 @@ p7 <-
       name   = "",
       values = c(
         "Observed"        = "black",
-        "Fitted model"    = "#219ebc",
+        "Fitted model"    = "#1f77b4",
         "PCV13 implementation"   = "#fb8500"
       )
     ) +
@@ -359,17 +369,19 @@ p7 <-
       name   = "",
       values = c("Observed" = 16)
     ) +
+    coord_cartesian(ylim = c(0, ymax_spline)) +
     labs(
-      title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
+      title = "Peru - ITS Spline Fit",
       x     = "Date",
-      y     = "<5 Deaths"
+      y     = "<5 yo Deaths"
     ) +
     theme_linedraw() +
     theme(
       axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
       axis.text.y     = element_text(size = 10),
       legend.position = "top",
-      legend.text     = element_text(size = 12)
+      legend.text     = element_text(size = 10),
+      plot.title      = element_text(face = "bold", size = 12)
     )
 
 
@@ -405,7 +417,7 @@ Plot the model
 
 p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
   # observed points
-  geom_point(aes(y = under5_deaths_pre, color = "Observed"), size = 1, alpha = 0.6) +
+  geom_point(aes(y = under5_deaths_pre, color = "Observed", shape = "Observed"), size = 1, alpha = 0.6) +
   # fitted (counterfactual) line
   geom_line( aes(y = pred.cf_model,    color = "Fitted model"),  size = 0.6) +
   # vaccine rollout
@@ -417,7 +429,7 @@ p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
     name = "",    # no legend title
     values = c(
       "Observed"      = "black",
-      "Fitted model"  = "#8ecae6",
+      "Fitted model"  = "#1f77b4",
       "PCV13 implementation" = "#fb8500"
     )
   ) +
@@ -426,17 +438,19 @@ p9 <- ggplot(ds.pred.cf_model, aes(x = date)) +
     name   = "",
     values = c("Observed" = 16)
   ) +
+  coord_cartesian(ylim = c(0, ymax_spline)) +
   labs(
-    title = "Extrapolation Based on the Pre-Vaccine Period",
+    title = "Peru - Pre-Vaccine Extrapolation",
     x     = "Date",
-    y     = "<5 Deaths"
+    y     = "<5 yo Deaths"
   ) +
   theme_linedraw() +
   theme(
     axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
     axis.text.y     = element_text(size = 10),
     legend.position = "top",
-    legend.text     = element_text(size = 12)
+    legend.text     = element_text(size = 10),
+    plot.title      = element_text(face = "bold", size = 12)
   )
 p9
 ```
@@ -447,8 +461,8 @@ combined <- p7 | p9
 ggsave(
   filename = "PERU_two_panel.png",
   plot     = combined,
-  width    = 12,
-  height   = 5,
+  width    = 11, #7
+  height   = 5, #9
   units    = "in",
   dpi      = 300
 )
@@ -456,94 +470,106 @@ ggsave(
 
 # Regional Time Series Analysis
 
-Now we will implement these models for each region.
+Now we will implement these models for the bottom Five Poorest countries, then for each region.
+
+```{r}
+regions_bottom5 <- c("PUNO", "HUANCAVELICA", "SAN MARTIN", "APURIMAC", "HUANUCO")
+
+df_bottom5_sum <- df_region %>%
+  filter(region %in% regions_bottom5) %>%      # keep only the five regions
+  group_by(date) %>%                        # aggregate by date
+  summarise(
+    under5_deaths = sum(under5_deaths, na.rm = TRUE),
+    under5_cases  = sum(under5_cases,  na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(region = "Five Poorest (sum)")    # optional label
+
+df_bottom5_sum
+```
 
 ## Functions
 
 Function for a regional spline ITS plot.
 
 ```{r}
-plot_region_spline <- function(region_name, df_region, intro_date) {
-  # Subset region and prepare indices
-  df_reg <- df_region %>%
-    filter(tolower(region) == tolower(region_name)) %>%
-    arrange(date)
-  
-  # Determine common y-axis max from observed deaths
-  y_max <- max(df_reg$under5_deaths, na.rm = TRUE)
 
-  # Build spline predictors and fit
+plot_region_spline <- function(region_name,
+                               df_region,
+                               intro_date,
+                               filter_region = TRUE,
+                               y_max = NULL,
+                               title_suffix = "- ITS Spline Fit") {
+  # Prepare data frame (either filter or treat as already aggregated)
+  if (filter_region) {
+    df_reg <- df_region %>%
+      filter(tolower(region) == tolower(region_name)) %>%
+      arrange(date)
+    if (nrow(df_reg) == 0)
+      stop("Region '", region_name, "' not found in df_region.")
+  } else {
+    df_reg <- df_region %>%
+      arrange(date)
+  }
+
+  # Index of intro date (ensure intro_date exists)
+  if (!intro_date %in% df_reg$date) {
+    warning("intro_date not found in the series; spline change term may be misaligned.")
+  }
+
+  intro_idx <- which(df_reg$date == intro_date)[1]
+
   df_plot <- df_reg %>%
     mutate(
       index      = row_number(),
       month      = factor(month(date), levels = 1:12),
       log_offset = log(under5_cases + 1),
-      spl1       = pmax(index - which(date == intro_date) + 1, 0)
-    ) %>%
-    {
-      mod <- glm.nb(under5_deaths ~ index + month + offset(log_offset) + spl1, data = .)
-      pred <- predict(mod, type = "response", se.fit = TRUE)
-      bind_cols(.,
-        fit = pred$fit,
-        se  = pred$se.fit
-      )
-    } %>%
-    mutate(
-      conf.lo = fit - 1.96 * se,
-      conf.hi = fit + 1.96 * se
+      # Simple post‑intro slope change term (0 pre, increasing after)
+      spl1       = ifelse(is.na(intro_idx), 0, pmax(index - intro_idx + 1, 0))
     )
 
-  # Plot with unified scale
-  ggplot() +
-    geom_point(
-      data = df_plot,
-      aes(x = date, y = under5_deaths, shape = "Observed"),
-      color = "black", size = 1, alpha = 0.6
-    ) +
-    geom_line(
-      data = df_plot,
-      aes(x = date, y = fit, color = "Fitted model"),
-      size = 0.6
-    ) +
-    geom_ribbon(
-      data = df_plot,
-      aes(x = date, ymin = conf.lo, ymax = conf.hi, fill = "95% CI"),
-      alpha = 0.3
-    ) +
-    geom_vline(
-      aes(xintercept = intro_date, color = "PCV13 introduction"),
-      linetype = "dashed", size = 1
-    ) +
-    scale_color_manual(
-      name = "",
-      values = c(
-        "Fitted model" = "#8ecae6",
-        "PCV13 introduction" = "#fb8500"
-      )
-    ) +
-    scale_fill_manual(
-      name = "",
-      values = c(
-        "95% CI" = "#219ebc"
-      )
-    ) +
-    scale_shape_manual(
-      name = "",
-      values = c(
-        "Observed" = 16
-      )
-    ) +
+  mod  <- glm.nb(under5_deaths ~ index + month + offset(log_offset) + spl1, data = df_plot)
+  pred <- predict(mod, type = "response", se.fit = TRUE)
+
+  df_plot <- df_plot %>%
+    mutate(
+      fit     = pred$fit,
+      se      = pred$se.fit,
+      conf.lo = pmax(fit - 1.96 * se, 0),
+      conf.hi = fit + 1.96 * se
+    )
+  if (is.null(y_max)) {
+    y_max <- max(df_plot$under5_deaths, df_plot$conf.hi, na.rm = TRUE)
+    y_max <- ceiling(y_max * 1.05)
+  }
+
+
+
+  ggplot(df_plot) +
+    geom_point(aes(x = date, y = under5_deaths, shape = "Observed"),
+               color = "black", size = 1, alpha = 0.6) +
+    geom_ribbon(aes(x = date, ymin = conf.lo, ymax = conf.hi, fill = "95% CI"),
+                alpha = 0.25) +
+    geom_line(aes(x = date, y = fit, color = "Fitted model"), size = 0.6) +
+    geom_vline(aes(xintercept = intro_date, color = "PCV13 introduction"),
+               linetype = "dashed", size = 1) +
+    scale_color_manual(values = c("Fitted model" = "#1f77b4",
+                                  "PCV13 introduction" = "#fb8500"),
+                       name = "") +
+    scale_fill_manual(values = c("95% CI" = "#219ebc"), name = "") +
+    scale_shape_manual(values = c("Observed" = 16), name = "") +
     coord_cartesian(ylim = c(0, y_max)) +
     labs(
-      title = paste(region_name, "— ITS Spline Fit"),
-      x = "Date", y = "<5 Deaths"
+      title = paste(region_name, title_suffix),
+      x = "Date", y = "<5 yo Deaths"
     ) +
     theme_linedraw() +
     theme(
-      axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
+      axis.text.x     = element_text(size = 9, angle = 90, hjust = 1),
       axis.text.y     = element_text(size = 10),
       legend.position = "top",
-      legend.text     = element_text(size = 12)
+      legend.text     = element_text(size = 10),
+      plot.title      = element_text(face = "bold", size = 12)
     )
 }
 
@@ -552,28 +578,46 @@ plot_region_spline <- function(region_name, df_region, intro_date) {
 Function for the region's counter factual.
 
 ```{r}
-plot_region_extrapolation <- function(region_name, df_region, intro_date) {
-  # 1) subset and prepare
-  df_reg <- df_region %>%
-    filter(tolower(region) == tolower(region_name)) %>%
-    arrange(date) %>%
+plot_region_extrapolation <- function(region_name,
+                                      df_region,
+                                      intro_date,
+                                      filter_region = TRUE,
+                                      y_max = NULL,
+                                      title_suffix = "- Pre-Vaccine Extrapolation") {
+
+  if (filter_region) {
+    df_reg <- df_region %>%
+      filter(tolower(region) == tolower(region_name)) %>%
+      arrange(date)
+    if (nrow(df_reg) == 0)
+      stop("Region '", region_name, "' not found in df_region.")
+  } else {
+    df_reg <- df_region %>% arrange(date)
+  }
+
+  df_reg <- df_reg %>%
     mutate(
       index      = row_number(),
-      month      = factor(lubridate::month(date), levels=1:12),
+      month      = factor(month(date), levels = 1:12),
       log_offset = log(under5_cases + 1),
       deaths_pre = if_else(date < intro_date, under5_deaths, NA_real_)
     )
 
-  # 2) Fit *only* on the pre-vaccine rows
   df_fit <- df_reg %>% filter(!is.na(deaths_pre))
-  cf_mod <- glm.nb(deaths_pre ~ index + month + offset(log_offset),
-                   data = df_fit)
+  if (nrow(df_fit) == 0)
+    stop("No pre-vaccine data available before intro_date for region ", region_name)
 
-  # 3) Predict *over the full span*, so you get a counterfactual
+  cf_mod <- glm.nb(deaths_pre ~ index + month + offset(log_offset), data = df_fit)
+
   df_plot <- df_reg %>%
     mutate(fit_cf = predict(cf_mod, newdata = df_reg, type = "response"))
 
-  # 4) Plot
+  if (is.null(y_max)) {
+    y_max <- max(df_plot$under5_deaths, df_plot$fit_cf, na.rm = TRUE)
+    y_max <- ceiling(y_max * 1.05)
+  }
+
+
   ggplot() +
     geom_point(
       data = df_plot %>% filter(!is.na(deaths_pre)),
@@ -591,82 +635,256 @@ plot_region_extrapolation <- function(region_name, df_region, intro_date) {
     ) +
     scale_color_manual(
       name = "",
-      values = c(
-        "Counterfactual"     = "#8ecae6",
-        "PCV13 introduction" = "#fb8500"
-      )
+      values = c("Counterfactual" = "red",
+                 "PCV13 introduction" = "#fb8500")
     ) +
-    scale_shape_manual(
-      name = "",
-      values = c("Observed" = 16)
-    ) +
-    coord_cartesian(ylim = c(0, max(df_reg$under5_deaths, na.rm = TRUE))) +
+    scale_shape_manual(name = "", values = c("Observed" = 16)) +
+    coord_cartesian(ylim = c(0, y_max)) +
     labs(
-      title = paste(region_name, "— Pre-Vaccine Extrapolation"),
-      x = "Date", y = "<5 Deaths"
+      title = paste(region_name, title_suffix),
+      x = "Date", y = "<5 yo Deaths"
     ) +
     theme_linedraw() +
     theme(
-      axis.text.x     = element_text(size = 10, angle = 90, hjust = 1),
+      axis.text.x     = element_text(size = 9, angle = 90, hjust = 1),
       axis.text.y     = element_text(size = 10),
       legend.position = "top",
-      legend.text     = element_text(size = 12)
+      legend.text     = element_text(size = 10),
+      plot.title      = element_text(face = "bold", size = 12)
     )
 }
 ```
 
 ```{r}
-# spline ITS
-p1 <- plot_region_spline("MOQUEGUA", df_region, pcv13.intro.date)
-# extrapolation
-p2 <- plot_region_extrapolation("MOQUEGUA", df_region, pcv13.intro.date)
+plot_both_with_shared_scale <- function(region_name, df_region, intro_date, filter_region = TRUE) {
 
-# display
-print(p1)
-print(p2)
+  # Build a unified modeling frame
+  if (filter_region) {
+    base_df <- df_region %>%
+      filter(tolower(region) == tolower(region_name)) %>%
+      arrange(date)
+  } else {
+    base_df <- df_region %>% arrange(date)
+  }
+
+  df_base <- base_df %>%
+    mutate(index = row_number(),
+           month = factor(lubridate::month(date), levels = 1:12),
+           log_offset = log(under5_cases + 1),
+           deaths_pre = if_else(date < intro_date, under5_deaths, NA_real_))
+
+  # Counterfactual
+  cf_mod <- glm.nb(deaths_pre ~ index + month + offset(log_offset),
+                   data = df_base %>% filter(!is.na(deaths_pre)))
+  df_cf  <- df_base %>% mutate(fit_cf = predict(cf_mod, newdata = ., type = "response"))
+
+  # Spline
+  intro_idx <- which(df_base$date == intro_date)[1]
+  df_spl <- df_base %>%
+    mutate(spl1 = ifelse(length(intro_idx)==0, 0, pmax(index - intro_idx + 1, 0)))
+  spl_mod <- glm.nb(under5_deaths ~ index + month + offset(log_offset) + spl1, data = df_spl)
+  pred_spl <- predict(spl_mod, type = "response", se.fit = TRUE)
+  df_spl <- df_spl %>%
+    mutate(fit = pred_spl$fit,
+           se = pred_spl$se.fit,
+           conf.hi = fit + 1.96 * se)
+
+  shared_y_max <- max(df_cf$under5_deaths, df_cf$fit_cf,
+                      df_spl$under5_deaths, df_spl$conf.hi, na.rm = TRUE)
+  shared_y_max <- ceiling(shared_y_max * 1.05)
+
+  # Reuse the existing plotting functions
+  p_cf <- plot_region_extrapolation(region_name, df_region, intro_date,
+                                    filter_region = filter_region,
+                                    y_max = shared_y_max)
+
+  p_spl <- plot_region_spline(region_name, df_region, intro_date,
+                              filter_region = filter_region,
+                              y_max = shared_y_max)
+
+  list(
+  spline_plot        = p_spl,  
+  counterfactual_plot = p_cf        
+  )
+}
+
+
 ```
 
 ```{r}
-combined <- p1 | p2
+plots <- plot_both_with_shared_scale("Five Poorest (sum)", df_bottom5_sum, pcv13_intro_date, FALSE)
+
+p_spline <- plots$spline_plot
+p_cf     <- plots$counterfactual_plot
+
+# display
+print(p_spline)
+print(p_cf)
+```
+
+```{r}
+combined <- p_spline | p_cf
 
 ggsave(
-  filename = "MOQUEGUA_PUNO_two_panel.png",
+  filename = "FIVE_POOREST_two_panel.png",
   plot     = combined,
-  width    = 12,
-  height   = 5,
+  width    =11, #7
+  height   = 5, #9
   units    = "in",
   dpi      = 300
 )
 ```
 
+# Overlaying Plots
+
+Now we will overlay the spline model and counter factual.
+
+## Regional Overlay
+
 ```{r}
+library(dplyr)
 
-df_region %>%  
-  filter(region=="MOQUEGUA") %>%  
-  mutate(
-    is_pre    = date < pcv13_intro_date,
-    log_off   = log(under5_cases)
-  ) %>% 
-  summarize(
-    total_rows      = n(),
-    pre_rows        = sum(is_pre),
-    valid_pre_deaths= sum(is_pre & !is.na(under5_deaths)),
-    zero_cases      = sum(under5_cases == 0),
-    neginf_offsets  = sum(!is.finite(log_off))
-  ) -> diag
+plot_region_overlay <- function(region_name, df_region, intro_date, filter_region = TRUE) {
 
-print(diag)
+  ## 1) Prep 
+  df_base <- if (filter_region) {
+    df_region %>% filter(tolower(region) == tolower(region_name)) %>% arrange(date)
+  } else {
+    df_region %>% arrange(date)
+  }
+
+  df_base <- df_base %>%
+    mutate(index = row_number(),
+           month = factor(lubridate::month(date), levels = 1:12),
+           log_offset = log(under5_cases + 1),
+           deaths_pre = if_else(date < intro_date, under5_deaths, NA_real_))
+
+  ## 2) Counterfactual model (PRE ONLY)
+  cf_fit  <- df_base %>% filter(!is.na(deaths_pre))
+  cf_mod  <- MASS::glm.nb(deaths_pre ~ index + month + offset(log_offset), data = cf_fit)
+  cf_df   <- df_base %>% mutate(fit_cf = predict(cf_mod, newdata = df_base, type = "response"))
+
+  ## 3) Spline ITS model (FULL SPAN)
+  intro_idx <- which(df_base$date == intro_date)[1]
+  df_spl_in <- df_base %>%
+    mutate(spl1 = if (length(intro_idx) == 0) 0 else pmax(index - intro_idx + 1, 0))
+
+  spl_mod <- MASS::glm.nb(under5_deaths ~ index + month + offset(log_offset) + spl1,
+                          data = df_spl_in)
+  ps      <- predict(spl_mod, type = "response", se.fit = TRUE)
+
+  spl_df  <- df_spl_in %>%
+    mutate(fit = ps$fit,
+           se  = ps$se.fit,
+           conf.lo = pmax(fit - 1.96 * se, 0),
+           conf.hi = fit + 1.96 * se)
+
+  ## 4) Merge 
+  df_plot <- dplyr::left_join(
+    cf_df %>% dplyr::select(date, deaths_pre, under5_deaths, fit_cf),
+    spl_df %>% dplyr::select(date, fit, conf.lo, conf.hi),
+    by = "date"
+  )
+
+  ## 4b) Bootstrap RR (Observed / Counterfactual post-PCV) 
+  set.seed(123)
+  n_sim   <- 5000
+  post_ix <- df_plot$date >= intro_date
+  theta   <- cf_mod$theta
+
+  mu_obs <- df_plot$under5_deaths[post_ix]
+  mu_cf  <- df_plot$fit_cf[post_ix]
+
+  rr_sims <- replicate(n_sim, {
+    sim_obs <- rnbinom(length(mu_obs), mu = mu_obs, size = theta)
+    sim_cf  <- rnbinom(length(mu_cf),  mu = mu_cf,  size = theta)
+    sum(sim_obs) / sum(sim_cf)
+  })
+
+  RR_post <- mean(rr_sims)
+  ci_post <- quantile(rr_sims, c(.025, .975))
+
+  rr_summary <- data.frame(RR_post = RR_post,
+                           CI_low  = ci_post[1],
+                           CI_high = ci_post[2])
+
+  ## 5) Y-limit 
+  y_max <- max(df_plot$under5_deaths, df_plot$fit_cf, df_plot$conf.hi, na.rm = TRUE)
+  y_max <- ceiling(y_max * 1.05)
+
+  ## 6) Plot
+  p <- ggplot(df_plot, aes(x = date)) +
+    geom_point(aes(y = under5_deaths, shape = "Observed"),
+               color = "black", size = 1, alpha = 0.6) +
+    geom_ribbon(aes(ymin = conf.lo, ymax = conf.hi, fill = "95% CI"), alpha = 0.25) +
+    geom_line(aes(y = fit,    color = "Spline ITS"),       size = 0.7) +
+    geom_line(aes(y = fit_cf, color = "Counterfactual"),   size = 0.7, linetype = "dashed") +
+    geom_vline(data = data.frame(x = intro_date),
+               inherit.aes = FALSE,
+               aes(xintercept = x, color = "PCV13 introduction"),
+               linetype = "dotdash", size = 1) +
+    scale_color_manual(name = "", values = c(
+      "Spline ITS" = "#1f77b4",
+      "Counterfactual" = "#fb8500",
+      "PCV13 introduction" = "gray30"
+    )) +
+    scale_fill_manual(name = "", values = c("95% CI" = "#219ebc")) +
+    scale_shape_manual(name = "", values = c("Observed" = 16)) +
+    coord_cartesian(ylim = c(0, y_max)) +
+    labs(title = paste(region_name, "— Spline ITS & Counterfactual"),
+         x = "Date", y = "<5 yo Deaths") +
+    theme_linedraw() +
+    theme(
+      axis.text.x  = element_text(size = 14, angle = 90, hjust = 1),
+      axis.title.x = element_text(size = 15),
+      axis.text.y  = element_text(size = 14),
+      axis.title.y = element_text(size = 15),
+      legend.position = "top",
+      legend.text  = element_text(size = 11),
+      plot.title   = element_text(face = "bold", size = 15)
+    )
+
+  ## 7) Return 
+  list(plot = p,
+       rr_summary = rr_summary,
+       rr_sims = rr_sims,
+       data = df_plot)
+}
+
 ```
 
-## All regions plotted
-
 ```{r}
-regions <- unique(df_region$region)
-
-#this doesn't work.
+p_overlay <- plot_region_overlay("Five Poorest (sum)", df_bottom5_sum, pcv13_intro_date, FALSE)
+p_overlay$rr_summary
+p_overlay$plot
 ```
 
 ```{r}
-moq_cases <- df_region[df_region$region == "MOQUEGUA", c("date","under5_deaths","under5_cases")]
-head(moq_cases)
+ggsave(
+  filename = "FIVE_POOREST_overlay.png",
+  plot     = p_overlay,
+  width    =9, #9, 11
+  height   = 7, #7, 5
+  units    = "in",
+  dpi      = 300
+)
+```
+
+## National Plot Overlay
+
+```{r}
+p_peru_overlay <- plot_region_overlay("National", df_nation, pcv13_intro_date, FALSE)
+p_peru_overlay$rr_summary
+p_overlay$plot
+```
+
+```{r}
+ggsave(
+  filename = "PERU_overlay.png",
+  plot     = p_peru_overlay,
+  width    =9, #9
+  height   = 7, #7
+  units    = "in",
+  dpi      = 300
+)
 ```
